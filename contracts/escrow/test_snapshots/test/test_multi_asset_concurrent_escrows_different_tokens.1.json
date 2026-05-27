@@ -1,6 +1,6 @@
 {
   "generators": {
-    "address": 9,
+    "address": 11,
     "nonce": 0,
     "mux_id": 0
   },
@@ -43,6 +43,7 @@
         }
       ]
     ],
+    [],
     [],
     [
       [
@@ -110,6 +111,9 @@
                   "i128": "150"
                 },
                 {
+                  "u32": 0
+                },
+                {
                   "u64": "3600"
                 }
               ]
@@ -141,6 +145,9 @@
                   "i128": "500"
                 },
                 {
+                  "u32": 0
+                },
+                {
                   "u64": "3600"
                 }
               ]
@@ -160,7 +167,7 @@
               "function_name": "fund_escrow",
               "args": [
                 {
-                  "u32": 1
+                  "u64": "1"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -203,7 +210,7 @@
               "function_name": "fund_escrow",
               "args": [
                 {
-                  "u32": 2
+                  "u64": "2"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
@@ -250,7 +257,7 @@
               "function_name": "confirm_delivery",
               "args": [
                 {
-                  "u32": 1
+                  "u64": "1"
                 }
               ]
             }
@@ -269,10 +276,16 @@
               "function_name": "raise_dispute",
               "args": [
                 {
-                  "u32": 2
+                  "u64": "2"
                 },
                 {
-                  "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
+                  "symbol": "reason"
+                },
+                {
+                  "string": "desc"
+                },
+                {
+                  "bytes": "abababababababababababababababababababababababababababababababab"
                 }
               ]
             }
@@ -291,10 +304,10 @@
               "function_name": "resolve_dispute",
               "args": [
                 {
-                  "u32": 2
+                  "u64": "2"
                 },
                 {
-                  "bool": false
+                  "u32": 1
                 }
               ]
             }
@@ -602,10 +615,90 @@
                       "key": {
                         "vec": [
                           {
+                            "symbol": "Admin"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVAX5"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "Dispute"
+                          },
+                          {
+                            "u64": "2"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "map": [
+                          {
+                            "key": {
+                              "symbol": "description"
+                            },
+                            "val": {
+                              "string": "desc"
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "escrow_id"
+                            },
+                            "val": {
+                              "u64": "2"
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "evidence_hash"
+                            },
+                            "val": {
+                              "bytes": "abababababababababababababababababababababababababababababababab"
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "raised_at"
+                            },
+                            "val": {
+                              "u64": "0"
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "reason"
+                            },
+                            "val": {
+                              "symbol": "reason"
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "status"
+                            },
+                            "val": {
+                              "vec": [
+                                {
+                                  "symbol": "Resolved"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
                             "symbol": "Escrow"
                           },
                           {
-                            "u32": 1
+                            "u64": "1"
                           }
                         ]
                       },
@@ -625,6 +718,14 @@
                             },
                             "val": {
                               "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "fee_bps"
+                            },
+                            "val": {
+                              "u32": 0
                             }
                           },
                           {
@@ -689,7 +790,7 @@
                             "symbol": "Escrow"
                           },
                           {
-                            "u32": 2
+                            "u64": "2"
                           }
                         ]
                       },
@@ -709,6 +810,14 @@
                             },
                             "val": {
                               "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "fee_bps"
+                            },
+                            "val": {
+                              "u32": 0
                             }
                           },
                           {
@@ -770,12 +879,24 @@
                       "key": {
                         "vec": [
                           {
-                            "symbol": "EscrowCount"
+                            "symbol": "EscrowCounter"
                           }
                         ]
                       },
                       "val": {
-                        "u32": 2
+                        "u64": "3"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "FeeCollector"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXI7N"
                       }
                     }
                   ]

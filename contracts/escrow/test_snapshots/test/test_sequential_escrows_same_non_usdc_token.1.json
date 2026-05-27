@@ -1,6 +1,6 @@
 {
   "generators": {
-    "address": 6,
+    "address": 8,
     "nonce": 0,
     "mux_id": 0
   },
@@ -24,6 +24,7 @@
         }
       ]
     ],
+    [],
     [],
     [
       [
@@ -69,6 +70,9 @@
                   "i128": "100"
                 },
                 {
+                  "u32": 0
+                },
+                {
                   "u64": "3600"
                 }
               ]
@@ -88,7 +92,7 @@
               "function_name": "fund_escrow",
               "args": [
                 {
-                  "u32": 1
+                  "u64": "1"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -131,7 +135,7 @@
               "function_name": "confirm_delivery",
               "args": [
                 {
-                  "u32": 1
+                  "u64": "1"
                 }
               ]
             }
@@ -163,6 +167,9 @@
                   "i128": "200"
                 },
                 {
+                  "u32": 0
+                },
+                {
                   "u64": "3600"
                 }
               ]
@@ -182,7 +189,7 @@
               "function_name": "fund_escrow",
               "args": [
                 {
-                  "u32": 2
+                  "u64": "2"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -225,7 +232,7 @@
               "function_name": "confirm_delivery",
               "args": [
                 {
-                  "u32": 2
+                  "u64": "2"
                 }
               ]
             }
@@ -257,6 +264,9 @@
                   "i128": "300"
                 },
                 {
+                  "u32": 0
+                },
+                {
                   "u64": "3600"
                 }
               ]
@@ -276,7 +286,7 @@
               "function_name": "fund_escrow",
               "args": [
                 {
-                  "u32": 3
+                  "u64": "3"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -319,7 +329,7 @@
               "function_name": "confirm_delivery",
               "args": [
                 {
-                  "u32": 3
+                  "u64": "3"
                 }
               ]
             }
@@ -603,10 +613,22 @@
                       "key": {
                         "vec": [
                           {
+                            "symbol": "Admin"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOLZM"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
                             "symbol": "Escrow"
                           },
                           {
-                            "u32": 1
+                            "u64": "1"
                           }
                         ]
                       },
@@ -630,6 +652,14 @@
                           },
                           {
                             "key": {
+                              "symbol": "fee_bps"
+                            },
+                            "val": {
+                              "u32": 0
+                            }
+                          },
+                          {
+                            "key": {
                               "symbol": "funded_at"
                             },
                             "val": {
@@ -690,7 +720,7 @@
                             "symbol": "Escrow"
                           },
                           {
-                            "u32": 2
+                            "u64": "2"
                           }
                         ]
                       },
@@ -714,6 +744,14 @@
                           },
                           {
                             "key": {
+                              "symbol": "fee_bps"
+                            },
+                            "val": {
+                              "u32": 0
+                            }
+                          },
+                          {
+                            "key": {
                               "symbol": "funded_at"
                             },
                             "val": {
@@ -774,7 +812,7 @@
                             "symbol": "Escrow"
                           },
                           {
-                            "u32": 3
+                            "u64": "3"
                           }
                         ]
                       },
@@ -794,6 +832,14 @@
                             },
                             "val": {
                               "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "fee_bps"
+                            },
+                            "val": {
+                              "u32": 0
                             }
                           },
                           {
@@ -855,12 +901,24 @@
                       "key": {
                         "vec": [
                           {
-                            "symbol": "EscrowCount"
+                            "symbol": "EscrowCounter"
                           }
                         ]
                       },
                       "val": {
-                        "u32": 3
+                        "u64": "4"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "FeeCollector"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5"
                       }
                     }
                   ]
