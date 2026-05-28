@@ -41,4 +41,10 @@ pub enum ContractError {
     InvalidStateTransition = 16,
     /// Returned when a supplied string or payload exceeds the supported length.
     InputTooLong = 17,
+    /// Returned when an address argument is invalid for its role (e.g. admin and
+    /// fee_collector must be distinct keys).
+    InvalidAddress = 18,
+    /// Returned when an update is a no-op because the new value equals the
+    /// current one (e.g. rotating admin to the same address).
+    SameAddress = 19,
 }

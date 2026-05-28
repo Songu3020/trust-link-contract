@@ -3,6 +3,7 @@ use soroban_sdk::{contract, contractimpl, token, Address, Env, String, Symbol, B
 
 pub mod errors;
 pub mod events;
+pub mod helpers;
 pub mod types;
 pub use crate::errors::ContractError;
 pub use crate::events::{
@@ -146,20 +147,6 @@ fn deduct_and_transfer(env: &Env, token_addr: &Address, recipient: &Address, amo
     Ok(())
 }
 
-/// Storage keys for persisting escrow data and the global escrow counter.
-fn ensure_not_paused(env: &Env) {
-    let paused = env
-        .storage()
-        .instance()
-        .get(&DataKey::Paused)
-        .unwrap_or(false);
-    assert!(!paused, "contract paused");
-}
-
-fn require_admin(env: &Env) -> Address {
-    env.storage().instance().get(&DataKey::Admin).expect("not initialized")
-}
-
 fn increment_counter(env: &Env, key: &DataKey) {
     let current: u64 = env.storage().instance().get(key).unwrap_or(0);
     env.storage().instance().set(key, &(current + 1));
@@ -169,9 +156,19 @@ fn increment_counter(env: &Env, key: &DataKey) {
 #[allow(deprecated)]
 impl Escrow {
     /// Sets the protocol fee collector, admin address, and arbitration fee. Must be called once.
-    pub fn initialize(env: Env, admin: Address, fee_collector: Address, arbitration_fee: i128) {
+    pub fn initialize(
+        env: Env,
+        admin: Address,
+        fee_collector: Address,
+        arbitration_fee: i128,
+    ) -> Result<(), ContractError> {
         if env.storage().instance().has(&DataKey::Admin) {
             panic!("already initialized");
+        }
+        // admin and fee_collector must be distinct keys: sharing one address
+        // means compromising the admin key also compromises all fee revenue.
+        if admin == fee_collector {
+            return Err(ContractError::InvalidAddress);
         }
 
         env.storage().instance().set(&DataKey::Admin, &admin);
@@ -179,6 +176,7 @@ impl Escrow {
         env.storage().instance().set(&DataKey::ArbitrationFee, &arbitration_fee);
         env.storage().instance().set(&DataKey::EscrowCounter, &1u64);
         env.storage().instance().set(&DataKey::Paused, &false);
+        Ok(())
     }
 
     pub fn pause_contract(env: Env) {
@@ -197,16 +195,27 @@ impl Escrow {
         emit_contract_unpaused(&env, admin);
     }
 
+    /// Returns whether the contract is currently paused.
+    pub fn is_paused(env: Env) -> bool {
+        env.storage().instance().get(&DataKey::Paused).unwrap_or(false)
+    }
+
     /// Rotates the admin to a new address. Requires auth from the current admin.
-    pub fn set_admin(env: Env, new_admin: Address) {
+    pub fn set_admin(env: Env, new_admin: Address) -> Result<(), ContractError> {
         let old_admin: Address = env
             .storage()
             .instance()
             .get(&DataKey::Admin)
             .expect("not initialized");
         old_admin.require_auth();
+        // Reject no-op rotations to the same address so monitoring isn't polluted
+        // with misleading AdminRotated events.
+        if new_admin == old_admin {
+            return Err(ContractError::SameAddress);
+        }
         env.storage().instance().set(&DataKey::Admin, &new_admin);
         emit_admin_rotated(&env, old_admin, new_admin);
+        Ok(())
     }
 
     /// Updates the default protocol fee. Requires admin auth.
@@ -425,7 +434,7 @@ impl Escrow {
 
         save_escrow(&env, escrow_id, &updated);
         increment_counter(&env, &DataKey::TotalCompleted);
-        emit_escrow_completed(&env, escrow_id, escrow.seller, escrow.amount, escrow.fee_bps);
+        emit_escrow_completed(&env, escrow_id, updated.seller.clone(), updated.amount, updated.fee_bps);
         Ok(())
     }
 
@@ -536,10 +545,10 @@ impl Escrow {
         emit_dispute_resolved(
             &env,
             escrow_id,
-            escrow.resolver,
+            updated.resolver.clone(),
             resolution,
             recipient,
-            escrow.amount,
+            updated.amount,
             arbitration_fee,
         );
         Ok(())
@@ -580,7 +589,7 @@ impl Escrow {
 
         save_escrow(&env, escrow_id, &updated);
         increment_counter(&env, &DataKey::TotalCompleted);
-        emit_auto_released(&env, escrow_id, escrow.seller, escrow.amount, escrow.fee_bps);
+        emit_auto_released(&env, escrow_id, updated.seller.clone(), updated.amount, updated.fee_bps);
         Ok(())
     }
 
@@ -657,6 +666,9 @@ impl Escrow {
             fee_bps,
             fee_collector,
             escrow_count,
+        }
+    }
+
     /// Returns on-chain counters for escrow lifecycle events.
     pub fn get_stats(env: Env) -> ContractStats {
         ContractStats {
@@ -669,6 +681,7 @@ impl Escrow {
 }
 
 mod test;
+mod test_edge_cases;
 mod test_withdraw_fees;
 mod test_dispute;
 mod test_escrow_id;
