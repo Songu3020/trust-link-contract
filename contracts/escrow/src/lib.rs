@@ -73,9 +73,9 @@ pub enum ContractError {
     ShippingWindowNotElapsed = 9,
     InvalidEvidenceHash = 10,
     DisputeNotFound = 11,
-    ContractPaused = 12,
-    ArithmeticOverflow = 13,
-    DisputeWindowClosed = 14,
+    ArithmeticError = 12,
+    DisputeWindowClosed = 13,
+    ContractPaused = 14,
 }
 
 /// Lifecycle states of an escrow transaction.
@@ -131,20 +131,6 @@ pub struct FeesWithdrawn {
     pub timestamp: u64,
 }
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ContractPaused {
-    pub admin: Address,
-    pub timestamp: u64,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ContractUnpaused {
-    pub admin: Address,
-    pub timestamp: u64,
-}
-
 /// Protocol fee configuration.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -170,8 +156,36 @@ pub struct DeliveryRecorded {
     pub delivered_at: u64,
 }
 
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContractPausedEvent {
+    pub admin: Address,
+    pub timestamp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContractUnpausedEvent {
+    pub admin: Address,
+    pub timestamp: u64,
+}
+
 #[contract]
 pub struct Escrow;
+
+fn ensure_not_paused(env: &Env) {
+    let paused: bool = env.storage().instance().get(&DataKey::Paused).unwrap_or(false);
+    if paused {
+        panic!("contract paused");
+    }
+}
+
+fn require_admin(env: &Env) -> Address {
+    env.storage()
+        .instance()
+        .get(&DataKey::Admin)
+        .expect("not initialized")
+}
 
 fn get_ttl_extension(env: &Env) -> u32 {
     env.storage()
@@ -184,9 +198,7 @@ fn save_escrow(env: &Env, id: u64, escrow: &EscrowData) {
     let key = DataKey::Escrow(id);
     let ext = get_ttl_extension(env);
     env.storage().persistent().set(&key, escrow);
-    env.storage()
-        .persistent()
-        .extend_ttl(&key, ext.checked_div(2).unwrap_or(0), ext);
+    env.storage().persistent().extend_ttl(&key, ext / 2, ext);
 }
 
 fn load_escrow(env: &Env, id: u64) -> Result<EscrowData, ContractError> {
@@ -197,9 +209,7 @@ fn load_escrow(env: &Env, id: u64) -> Result<EscrowData, ContractError> {
         .get(&key)
         .ok_or(ContractError::EscrowNotFound)?;
     let ext = get_ttl_extension(env);
-    env.storage()
-        .persistent()
-        .extend_ttl(&key, ext.checked_div(2).unwrap_or(0), ext);
+    env.storage().persistent().extend_ttl(&key, ext / 2, ext);
     Ok(escrow)
 }
 
@@ -207,9 +217,7 @@ fn save_dispute(env: &Env, id: u64, dispute: &DisputeData) {
     let key = DataKey::Dispute(id);
     let ext = get_ttl_extension(env);
     env.storage().persistent().set(&key, dispute);
-    env.storage()
-        .persistent()
-        .extend_ttl(&key, ext.checked_div(2).unwrap_or(0), ext);
+    env.storage().persistent().extend_ttl(&key, ext / 2, ext);
 }
 
 fn load_dispute(env: &Env, id: u64) -> Result<DisputeData, ContractError> {
@@ -220,62 +228,29 @@ fn load_dispute(env: &Env, id: u64) -> Result<DisputeData, ContractError> {
         .get(&key)
         .ok_or(ContractError::DisputeNotFound)?;
     let ext = get_ttl_extension(env);
-    env.storage()
-        .persistent()
-        .extend_ttl(&key, ext.checked_div(2).unwrap_or(0), ext);
+    env.storage().persistent().extend_ttl(&key, ext / 2, ext);
     Ok(dispute)
 }
 
-fn deduct_and_transfer(
-    env: &Env,
-    token_addr: &Address,
-    recipient: &Address,
-    amount: i128,
-    fee_bps: u32,
-) -> Result<(), ContractError> {
+fn deduct_and_transfer(env: &Env, token_addr: &Address, recipient: &Address, amount: i128, fee_bps: u32) -> Result<(), ContractError> {
     if amount < 0 {
         return Err(ContractError::InvalidAmount);
     }
 
-    // Overflow-safe fee calculation using checked arithmetic.
-    // Returns ArithmeticOverflow instead of wrapping in release builds.
-    let part1 = amount
-        .checked_div(10_000)
-        .ok_or(ContractError::ArithmeticOverflow)?
+    // Split calculation to avoid overflow for large amounts
+    let part1 = (amount / 10_000)
         .checked_mul(fee_bps as i128)
-        .ok_or(ContractError::ArithmeticOverflow)?;
-
+        .ok_or(ContractError::ArithmeticError)?;
     let part2 = (amount % 10_000)
         .checked_mul(fee_bps as i128)
-        .ok_or(ContractError::ArithmeticOverflow)?
-        .checked_div(10_000)
-        .ok_or(ContractError::ArithmeticOverflow)?;
+        .ok_or(ContractError::ArithmeticError)?
+        / 10_000;
 
-    let fee = part1
-        .checked_add(part2)
-        .ok_or(ContractError::ArithmeticOverflow)?;
-    let net = amount
-        .checked_sub(fee)
-        .ok_or(ContractError::ArithmeticOverflow)?;
+    let fee = part1.checked_add(part2).ok_or(ContractError::ArithmeticError)?;
+    let net = amount.checked_sub(fee).ok_or(ContractError::ArithmeticError)?;
 
     token::Client::new(env, token_addr).transfer(&env.current_contract_address(), recipient, &net);
     Ok(())
-}
-
-fn ensure_not_paused(env: &Env) {
-    let paused = env
-        .storage()
-        .instance()
-        .get(&DataKey::Paused)
-        .unwrap_or(false);
-    assert!(!paused, "contract paused");
-}
-
-fn require_admin(env: &Env) -> Address {
-    env.storage()
-        .instance()
-        .get(&DataKey::Admin)
-        .expect("not initialized")
 }
 
 #[contractimpl]
@@ -300,29 +275,25 @@ impl Escrow {
     pub fn pause_contract(env: Env) {
         let admin = require_admin(&env);
         admin.require_auth();
-
         env.storage().instance().set(&DataKey::Paused, &true);
         env.events().publish(
             (soroban_sdk::Symbol::new(&env, "contract_paused"),),
-            ContractPaused {
-                admin,
-                timestamp: env.ledger().timestamp(),
-            },
+            ContractPausedEvent { admin, timestamp: env.ledger().timestamp() },
         );
     }
 
     pub fn unpause_contract(env: Env) {
         let admin = require_admin(&env);
         admin.require_auth();
-
         env.storage().instance().set(&DataKey::Paused, &false);
         env.events().publish(
             (soroban_sdk::Symbol::new(&env, "contract_unpaused"),),
-            ContractUnpaused {
-                admin,
-                timestamp: env.ledger().timestamp(),
-            },
+            ContractUnpausedEvent { admin, timestamp: env.ledger().timestamp() },
         );
+    }
+
+    pub fn is_paused(env: Env) -> bool {
+        env.storage().instance().get(&DataKey::Paused).unwrap_or(false)
     }
 
     /// Rotates the admin to a new address. Requires auth from the current admin.
@@ -381,7 +352,7 @@ impl Escrow {
         amount: i128,
     ) -> Result<(), ContractError> {
         ensure_not_paused(&env);
-        let admin = require_admin(&env);
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("not initialized");
         admin.require_auth();
 
         if amount <= 0 {
@@ -530,6 +501,7 @@ impl Escrow {
     }
 
     pub fn confirm_delivery(env: Env, escrow_id: u64) -> Result<(), ContractError> {
+        ensure_not_paused(&env);
         let escrow = load_escrow(&env, escrow_id)?;
 
         if escrow.state != EscrowState::Funded && escrow.state != EscrowState::Shipped {
@@ -603,11 +575,7 @@ impl Escrow {
         Ok(())
     }
 
-    pub fn resolve_dispute(
-        env: Env,
-        escrow_id: u64,
-        resolution: ResolutionType,
-    ) -> Result<(), ContractError> {
+    pub fn resolve_dispute(env: Env, escrow_id: u64, resolution: ResolutionType) -> Result<(), ContractError> {
         ensure_not_paused(&env);
         let mut escrow = load_escrow(&env, escrow_id)?;
 
@@ -761,10 +729,13 @@ mod test_arbitration_fee;
 mod test_delivery;
 mod test_dispute;
 mod test_escrow_id;
+mod test_resolution;
+mod test_overflow;
 mod test_fee_minimum;
 mod test_helpers;
 mod test_overflow;
 mod test_pause;
 mod test_resolution;
 mod test_ttl;
-mod test_withdraw_fees;
+mod test_delivery;
+mod test_pause;
