@@ -1,8 +1,8 @@
 #![cfg(test)]
 
+use crate::test_helpers::{advance_time, create_funded_escrow, setup_contract};
+use crate::EscrowState;
 use soroban_sdk::{testutils::Address as _, Address, Env};
-use crate::{EscrowState};
-use crate::test_helpers::{setup_contract, create_funded_escrow, advance_time};
 
 fn register_token(env: &Env) -> Address {
     let token_admin = Address::generate(env);
@@ -21,7 +21,9 @@ fn test_mark_shipped_transitions_state() {
     let buyer = Address::generate(&env);
     let resolver = Address::generate(&env);
 
-    let id = create_funded_escrow(&env, &client, &seller, &buyer, &resolver, &token, 1000, 100, 3600);
+    let id = create_funded_escrow(
+        &env, &client, &seller, &buyer, &resolver, &token, 1000, 100, 3600,
+    );
 
     client.mark_shipped(&id);
 
@@ -41,7 +43,9 @@ fn test_record_delivery_sets_timestamp() {
     let buyer = Address::generate(&env);
     let resolver = Address::generate(&env);
 
-    let id = create_funded_escrow(&env, &client, &seller, &buyer, &resolver, &token, 1000, 100, 3600);
+    let id = create_funded_escrow(
+        &env, &client, &seller, &buyer, &resolver, &token, 1000, 100, 3600,
+    );
 
     client.mark_shipped(&id);
 
@@ -67,7 +71,9 @@ fn test_record_delivery_requires_shipped_state() {
     let buyer = Address::generate(&env);
     let resolver = Address::generate(&env);
 
-    let id = create_funded_escrow(&env, &client, &seller, &buyer, &resolver, &token, 1000, 100, 3600);
+    let id = create_funded_escrow(
+        &env, &client, &seller, &buyer, &resolver, &token, 1000, 100, 3600,
+    );
 
     // Not marked shipped — should return InvalidState
     let res = client.try_record_delivery(&id);
@@ -86,7 +92,9 @@ fn test_confirm_delivery_after_mark_shipped() {
     let buyer = Address::generate(&env);
     let resolver = Address::generate(&env);
 
-    let id = create_funded_escrow(&env, &client, &seller, &buyer, &resolver, &token, 1000, 0, 3600);
+    let id = create_funded_escrow(
+        &env, &client, &seller, &buyer, &resolver, &token, 1000, 0, 3600,
+    );
 
     client.mark_shipped(&id);
     advance_time(&env, 172801);

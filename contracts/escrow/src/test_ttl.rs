@@ -1,7 +1,7 @@
 #![cfg(test)]
 
+use crate::test_helpers::{create_funded_escrow, setup_contract};
 use soroban_sdk::{testutils::Address as _, Address, Env};
-use crate::test_helpers::{setup_contract, create_funded_escrow};
 
 fn register_token(env: &Env) -> Address {
     let token_admin = Address::generate(env);
@@ -20,7 +20,9 @@ fn test_escrow_stored_in_persistent_storage() {
     let buyer = Address::generate(&env);
     let resolver = Address::generate(&env);
 
-    let id = create_funded_escrow(&env, &client, &seller, &buyer, &resolver, &token, 1000, 100, 3600);
+    let id = create_funded_escrow(
+        &env, &client, &seller, &buyer, &resolver, &token, 1000, 100, 3600,
+    );
 
     // Escrow is readable after funding (persistent storage works)
     let escrow = client.get_escrow(&id);
@@ -43,7 +45,9 @@ fn test_set_ttl_extension_persists() {
     let resolver = Address::generate(&env);
 
     // Escrow operations still work with custom TTL
-    let id = create_funded_escrow(&env, &client, &seller, &buyer, &resolver, &token, 500, 0, 3600);
+    let id = create_funded_escrow(
+        &env, &client, &seller, &buyer, &resolver, &token, 500, 0, 3600,
+    );
     let escrow = client.get_escrow(&id);
     assert_eq!(escrow.amount, 500);
 }
@@ -60,7 +64,9 @@ fn test_dispute_stored_in_persistent_storage() {
     let buyer = Address::generate(&env);
     let resolver = Address::generate(&env);
 
-    let id = create_funded_escrow(&env, &client, &seller, &buyer, &resolver, &token, 1000, 100, 3600);
+    let id = create_funded_escrow(
+        &env, &client, &seller, &buyer, &resolver, &token, 1000, 100, 3600,
+    );
 
     client.raise_dispute(
         &id,

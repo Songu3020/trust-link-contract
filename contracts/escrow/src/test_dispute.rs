@@ -1,7 +1,7 @@
 #![cfg(test)]
 
-use crate::{Escrow, EscrowClient, DisputeStatus};
-use soroban_sdk::{testutils::Address as _, token, Address, Env, Symbol, String, BytesN};
+use crate::{DisputeStatus, Escrow, EscrowClient};
+use soroban_sdk::{testutils::Address as _, token, Address, BytesN, Env, String, Symbol};
 
 fn setup_env() -> (Env, Address, Address, Address, Address, Address, Address) {
     let env = Env::default();
@@ -16,7 +16,15 @@ fn setup_env() -> (Env, Address, Address, Address, Address, Address, Address) {
 
     let token_address = env.register_stellar_asset_contract(token_admin.clone());
 
-    (env, admin, seller, buyer, resolver, token_address, fee_collector)
+    (
+        env,
+        admin,
+        seller,
+        buyer,
+        resolver,
+        token_address,
+        fee_collector,
+    )
 }
 
 #[test]
@@ -29,10 +37,10 @@ fn test_get_dispute_returns_accurate_data_after_raise() {
 
     let amount = 1000_i128;
     let id = client.create_escrow(&seller, &resolver, &token, &amount, &100_u32, &3600_u64);
-    
+
     let sac = token::StellarAssetClient::new(&env, &token);
     sac.mint(&buyer, &amount);
-    
+
     client.fund_escrow(&id, &buyer);
 
     let reason = Symbol::new(&env, "non_delivery");
@@ -41,9 +49,9 @@ fn test_get_dispute_returns_accurate_data_after_raise() {
     let timestamp = env.ledger().timestamp();
 
     client.raise_dispute(&id, &reason, &description, &evidence_hash);
-    
+
     let result = client.get_dispute(&id);
-    
+
     assert_eq!(result.escrow_id, id);
     assert_eq!(result.reason, reason);
     assert_eq!(result.description, description);

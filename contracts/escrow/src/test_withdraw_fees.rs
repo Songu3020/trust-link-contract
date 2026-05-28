@@ -1,7 +1,10 @@
 #![cfg(test)]
 
-use crate::{Escrow, EscrowClient, ContractError};
-use soroban_sdk::{testutils::{Address as _, Ledger}, token, Address, Env};
+use crate::{ContractError, Escrow, EscrowClient};
+use soroban_sdk::{
+    testutils::{Address as _, Ledger},
+    token, Address, Env,
+};
 
 fn setup_env() -> (Env, Address, Address, Address, Address, Address, Address) {
     let env = Env::default();
@@ -16,7 +19,15 @@ fn setup_env() -> (Env, Address, Address, Address, Address, Address, Address) {
 
     let token_address = env.register_stellar_asset_contract(token_admin.clone());
 
-    (env, admin, seller, buyer, resolver, token_address, fee_collector)
+    (
+        env,
+        admin,
+        seller,
+        buyer,
+        resolver,
+        token_address,
+        fee_collector,
+    )
 }
 
 fn mint_tokens(env: &Env, token: &Address, to: &Address, amount: i128) {
@@ -38,7 +49,8 @@ fn test_withdraw_fees_after_multiple_escrows() {
     for _ in 0..3 {
         let id = client.create_escrow(&seller, &resolver, &token, &1000_i128, &100_u32, &3600_u64);
         client.fund_escrow(&id, &buyer);
-        env.ledger().set_timestamp(env.ledger().timestamp() + 172801);
+        env.ledger()
+            .set_timestamp(env.ledger().timestamp() + 172801);
         client.confirm_delivery(&id);
     }
 
@@ -53,5 +65,8 @@ fn test_withdraw_fees_after_multiple_escrows() {
     assert_eq!(token::Client::new(&env, &token).balance(&to), 30);
     // Second withdraw for same amount fails with InsufficientBalance
     let result2 = client.try_withdraw_fees(&token, &to, &30);
-    assert!(matches!(result2, Err(Ok(ContractError::InsufficientBalance))));
+    assert!(matches!(
+        result2,
+        Err(Ok(ContractError::InsufficientBalance))
+    ));
 }

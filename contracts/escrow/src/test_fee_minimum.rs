@@ -1,11 +1,12 @@
 #![cfg(test)]
 
 use crate::{Escrow, EscrowClient, ResolutionType};
-use soroban_sdk::{testutils::{Address as _, Ledger}, token, Address, Env, Symbol, String as SorobanString};
+use soroban_sdk::{
+    testutils::{Address as _, Ledger},
+    token, Address, Env, String as SorobanString, Symbol,
+};
 
-fn setup(
-    env: &Env,
-) -> (Address, Address, Address, Address, Address, Address) {
+fn setup(env: &Env) -> (Address, Address, Address, Address, Address, Address) {
     env.mock_all_auths();
     let admin = Address::generate(env);
     let seller = Address::generate(env);
@@ -40,7 +41,8 @@ fn test_fee_rounds_to_zero_on_one_stroop_confirm_delivery() {
     // MAX_FEE_BPS = 300 (3%) — still rounds to 0 on 1 stroop
     let id = client.create_escrow(&seller, &resolver, &token, &1_i128, &300_u32, &3600_u64);
     client.fund_escrow(&id, &buyer);
-    env.ledger().set_timestamp(env.ledger().timestamp() + 172801);
+    env.ledger()
+        .set_timestamp(env.ledger().timestamp() + 172801);
     client.confirm_delivery(&id);
 
     let _escrow = client.get_escrow(&id);
@@ -64,7 +66,8 @@ fn test_fee_rounds_to_zero_on_one_stroop_auto_release() {
     client.fund_escrow(&id, &buyer);
 
     // Advance past dispute deadline (172800s) + shipping window (3600s)
-    env.ledger().set_timestamp(env.ledger().timestamp() + 172800 + 3600 + 1);
+    env.ledger()
+        .set_timestamp(env.ledger().timestamp() + 172800 + 3600 + 1);
     client.auto_release(&id);
 
     assert_eq!(balance(&env, &token, &seller), 1);
