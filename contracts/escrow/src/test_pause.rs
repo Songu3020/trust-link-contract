@@ -46,7 +46,7 @@ fn test_mark_shipped_blocked_when_paused() {
     let id = client.create_escrow(&seller, &resolver, &token, &100_i128, &0_u32, &3600_u64);
     client.fund_escrow(&id, &buyer);
     client.pause_contract();
-    let result = client.try_mark_shipped(&id);
+    let result = client.try_mark_shipped(&id, &soroban_sdk::String::from_str(&env, "TRACK001"));
     assert!(matches!(result, Err(Ok(ContractError::ContractPaused))));
 }
 
@@ -122,6 +122,21 @@ fn test_read_only_views_work_while_paused() {
     let _ = client.get_escrow(&id);
     let _ = client.get_fee_config();
     assert!(client.is_paused());
+}
+
+#[test]
+fn test_is_paused_reflects_state() {
+    let (env, _admin, _seller, _buyer, _resolver, _token, contract_id) = base_env();
+    let client = EscrowClient::new(&env, &contract_id);
+    
+    // Default should be false
+    assert!(!client.is_paused());
+    
+    client.pause_contract();
+    assert!(client.is_paused());
+    
+    client.unpause_contract();
+    assert!(!client.is_paused());
 }
 
 #[test]

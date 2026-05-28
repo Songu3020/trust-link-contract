@@ -358,6 +358,12 @@
                         }
                       ]
                     }
+                  },
+                  {
+                    "key": {
+                      "symbol": "tracking_id"
+                    },
+                    "val": "void"
                   }
                 ]
               }
@@ -478,6 +484,12 @@
                     "val": {
                       "address": "CACMVW2KK4H5FZDFF2AUCAKQTEJMZZWJUIZF23XMRVYQBSXYLHZ6BKWN"
                     }
+                  },
+                  {
+                    "key": {
+                      "symbol": "tracking_id"
+                    },
+                    "val": "void"
                   }
                 ]
               }

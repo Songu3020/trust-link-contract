@@ -136,6 +136,9 @@
               "args": [
                 {
                   "u64": "1"
+                },
+                {
+                  "string": "TRACK001"
                 }
               ]
             }
@@ -390,6 +393,14 @@
                     },
                     "val": {
                       "address": "CDS3FDGQ4JA2V3F26Y4BMWWJEC5TT26RJBN7KIQKUMVO2MAOCMDTSZ7A"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "tracking_id"
+                    },
+                    "val": {
+                      "string": "TRACK001"
                     }
                   }
                 ]

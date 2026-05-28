@@ -13,8 +13,7 @@ fn make_string(env: &Env, len: u32) -> SorobanString {
     assert!(len <= 512);
     let buf = [b'a'; 512];
     let slice = &buf[..(len as usize)];
-    let bytes = Bytes::from_slice(env, slice);
-    SorobanString::from_bytes(env, &bytes)
+    SorobanString::from_bytes(env, slice)
 }
 
 // ── tracking_id ──────────────────────────────────────────────────────────────
