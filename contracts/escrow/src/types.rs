@@ -67,6 +67,7 @@ pub enum ContractError {
     ArithmeticOverflow = 15,
     InvalidStateTransition = 16,
     InputTooLong = 17,
+    InvalidAddress = 18,
 }
 
 /// Lifecycle states of an escrow transaction.

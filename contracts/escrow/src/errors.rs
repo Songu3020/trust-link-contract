@@ -41,4 +41,6 @@ pub enum ContractError {
     InvalidStateTransition = 16,
     /// Returned when a supplied string or payload exceeds the supported length.
     InputTooLong = 17,
+    /// Returned when an address parameter is empty/zero or otherwise invalid (#55).
+    InvalidAddress = 18,
 }
