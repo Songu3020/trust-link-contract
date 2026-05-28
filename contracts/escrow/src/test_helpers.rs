@@ -1,7 +1,10 @@
 #![cfg(test)]
 
 use crate::{Escrow, EscrowClient};
-use soroban_sdk::{testutils::{Address as _, Ledger}, token, Address, Env};
+use soroban_sdk::{
+    testutils::{Address as _, Ledger},
+    token, Address, Env,
+};
 
 pub fn setup_contract(env: &Env) -> (Address, EscrowClient, Address, Address) {
     let contract_id = env.register(Escrow, ());
@@ -17,7 +20,8 @@ pub fn mint_token(env: &Env, token: &Address, to: &Address, amount: i128) {
 }
 
 pub fn advance_time(env: &Env, seconds: u64) {
-    env.ledger().set_timestamp(env.ledger().timestamp() + seconds);
+    env.ledger()
+        .set_timestamp(env.ledger().timestamp() + seconds);
 }
 
 pub fn create_funded_escrow(

@@ -1,7 +1,10 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{testutils::{Address as _, Ledger}, token, Address, Bytes, Env, Symbol, String as SorobanString};
+use soroban_sdk::{
+    testutils::{Address as _, Ledger},
+    token, Address, Bytes, Env, String as SorobanString, Symbol,
+};
 
 fn make_evidence_hash(env: &Env) -> Bytes {
     Bytes::from_array(env, &[0u8; 32])
@@ -19,7 +22,15 @@ fn setup_env() -> (Env, Address, Address, Address, Address, Address, Address) {
 
     let token_address = env.register_stellar_asset_contract(token_admin.clone());
 
-    (env, seller, buyer, resolver, token_admin, token_address, fee_collector)
+    (
+        env,
+        seller,
+        buyer,
+        resolver,
+        token_admin,
+        token_address,
+        fee_collector,
+    )
 }
 
 fn mint_tokens(env: &Env, token: &Address, to: &Address, amount: i128) {
@@ -89,7 +100,8 @@ fn test_confirm_delivery() {
     client.fund_escrow(&id, &buyer);
 
     // Advance time to allow confirm_delivery
-    env.ledger().set_timestamp(env.ledger().timestamp() + 172801);
+    env.ledger()
+        .set_timestamp(env.ledger().timestamp() + 172801);
     client.confirm_delivery(&id);
 
     let escrow = client.get_escrow(&id);
@@ -112,7 +124,12 @@ fn test_raise_and_resolve_dispute_release_to_seller() {
 
     let id = client.create_escrow(&seller, &resolver, &token, &1000_i128, &200_u32, &3600_u64);
     client.fund_escrow(&id, &buyer);
-    client.raise_dispute(&id, &Symbol::new(&env, "reason"), &SorobanString::from_str(&env, "desc"), &soroban_sdk::BytesN::from_array(&env, &[0u8; 32]));
+    client.raise_dispute(
+        &id,
+        &Symbol::new(&env, "reason"),
+        &SorobanString::from_str(&env, "desc"),
+        &soroban_sdk::BytesN::from_array(&env, &[0u8; 32]),
+    );
 
     client.resolve_dispute(&id, &ResolutionType::Release);
 
@@ -135,7 +152,12 @@ fn test_raise_and_resolve_dispute_refund_buyer() {
 
     let id = client.create_escrow(&seller, &resolver, &token, &1000_i128, &200_u32, &3600_u64);
     client.fund_escrow(&id, &buyer);
-    client.raise_dispute(&id, &Symbol::new(&env, "reason"), &SorobanString::from_str(&env, "desc"), &soroban_sdk::BytesN::from_array(&env, &[0u8; 32]));
+    client.raise_dispute(
+        &id,
+        &Symbol::new(&env, "reason"),
+        &SorobanString::from_str(&env, "desc"),
+        &soroban_sdk::BytesN::from_array(&env, &[0u8; 32]),
+    );
     client.resolve_dispute(&id, &ResolutionType::Refund);
 
     let escrow = client.get_escrow(&id);
@@ -158,7 +180,8 @@ fn test_auto_release() {
     let id = client.create_escrow(&seller, &resolver, &token, &1000_i128, &200_u32, &3600_u64);
     client.fund_escrow(&id, &buyer);
 
-    env.ledger().set_timestamp(env.ledger().timestamp() + 172801);
+    env.ledger()
+        .set_timestamp(env.ledger().timestamp() + 172801);
     client.auto_release(&id);
 
     let escrow = client.get_escrow(&id);
@@ -205,8 +228,18 @@ fn test_raise_dispute_only_once() {
     mint_tokens(&env, &token, &buyer, 1000);
     let id = client.create_escrow(&seller, &resolver, &token, &100_i128, &0_u32, &3600_u64);
     client.fund_escrow(&id, &buyer);
-    client.raise_dispute(&id, &Symbol::new(&env, "reason"), &SorobanString::from_str(&env, "desc"), &soroban_sdk::BytesN::from_array(&env, &[0u8; 32]));
-    let res = client.try_raise_dispute(&id, &Symbol::new(&env, "reason"), &SorobanString::from_str(&env, "desc"), &soroban_sdk::BytesN::from_array(&env, &[0u8; 32]));
+    client.raise_dispute(
+        &id,
+        &Symbol::new(&env, "reason"),
+        &SorobanString::from_str(&env, "desc"),
+        &soroban_sdk::BytesN::from_array(&env, &[0u8; 32]),
+    );
+    let res = client.try_raise_dispute(
+        &id,
+        &Symbol::new(&env, "reason"),
+        &SorobanString::from_str(&env, "desc"),
+        &soroban_sdk::BytesN::from_array(&env, &[0u8; 32]),
+    );
     assert!(matches!(res, Err(Ok(ContractError::InvalidState))));
 }
 
@@ -251,11 +284,14 @@ fn test_fund_and_confirm_delivery_with_non_usdc_token() {
     let admin = Address::generate(&env);
     client.initialize(&admin, &fee_collector, &0_i128);
     mint_tokens(&env, &alt_token, &buyer, 1000);
-    let id = client.create_escrow(&seller, &resolver, &alt_token, &300_i128, &100_u32, &3600_u64);
+    let id = client.create_escrow(
+        &seller, &resolver, &alt_token, &300_i128, &100_u32, &3600_u64,
+    );
     client.fund_escrow(&id, &buyer);
 
     // Advance time to allow confirm_delivery
-    env.ledger().set_timestamp(env.ledger().timestamp() + 172801);
+    env.ledger()
+        .set_timestamp(env.ledger().timestamp() + 172801);
     client.confirm_delivery(&id);
     // 1% fee on 300 = 3 kept in contract, 297 to seller
     assert_eq!(get_balance(&env, &alt_token, &seller), 297);
@@ -274,7 +310,8 @@ fn test_zero_fee_no_collector_transfer() {
     client.fund_escrow(&id, &buyer);
 
     // Advance time to allow confirm_delivery
-    env.ledger().set_timestamp(env.ledger().timestamp() + 172801);
+    env.ledger()
+        .set_timestamp(env.ledger().timestamp() + 172801);
     client.confirm_delivery(&id);
     assert_eq!(get_balance(&env, &token, &seller), 1000);
     assert_eq!(get_balance(&env, &token, &contract_id), 0);
@@ -323,7 +360,12 @@ fn test_dispute_before_deadline_succeeds() {
     env.ledger().set_timestamp(funded_at + 172740);
 
     // Dispute should succeed
-    client.raise_dispute(&id, &Symbol::new(&env, "reason"), &SorobanString::from_str(&env, "desc"), &soroban_sdk::BytesN::from_array(&env, &[0u8; 32]));
+    client.raise_dispute(
+        &id,
+        &Symbol::new(&env, "reason"),
+        &SorobanString::from_str(&env, "desc"),
+        &soroban_sdk::BytesN::from_array(&env, &[0u8; 32]),
+    );
 
     let escrow = client.get_escrow(&id);
     assert_eq!(escrow.state, EscrowState::Disputed);
@@ -350,7 +392,12 @@ fn test_dispute_after_deadline_fails() {
     env.ledger().set_timestamp(funded_at + 172800);
 
     // Dispute should fail with DisputeWindowClosed
-    let res = client.try_raise_dispute(&id, &Symbol::new(&env, "reason"), &SorobanString::from_str(&env, "desc"), &soroban_sdk::BytesN::from_array(&env, &[0u8; 32]));
+    let res = client.try_raise_dispute(
+        &id,
+        &Symbol::new(&env, "reason"),
+        &SorobanString::from_str(&env, "desc"),
+        &soroban_sdk::BytesN::from_array(&env, &[0u8; 32]),
+    );
     assert!(matches!(res, Err(Ok(ContractError::DisputeWindowClosed))));
 }
 

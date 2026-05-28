@@ -1,8 +1,8 @@
 #![cfg(test)]
 
+use crate::test_helpers::setup_contract;
 use crate::ContractError;
 use soroban_sdk::{testutils::Address as _, Address, Env};
-use crate::test_helpers::setup_contract;
 
 fn register_token(env: &Env) -> Address {
     let token_admin = Address::generate(env);
