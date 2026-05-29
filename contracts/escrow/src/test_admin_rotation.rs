@@ -12,7 +12,7 @@ fn setup() -> (Env, EscrowClient<'static>, Address) {
     let fee_collector = Address::generate(&env);
     let contract_id = env.register(Escrow, ());
     let client = EscrowClient::new(&env, &contract_id);
-    client.initialize(&admin, &fee_collector, &0_i128);
+    client.initialize(&admin, &fee_collector, &0_u32);
     (env, client, admin)
 }
 
@@ -42,14 +42,13 @@ fn new_admin_can_call_admin_functions_after_rotation() {
 
     // With all auths still mocked, the next admin-gated call succeeds because
     // `require_admin` resolves to the *new* admin and its auth is mocked.
-    client.set_fee(&50_u32);
+    client.set_protocol_fee(&50_u32);
 
     use crate::DataKey;
-    let fee: u32 = env
-        .as_contract(&client.address, || {
-            env.storage().instance().get(&DataKey::DefaultFeeBps).unwrap_or(0)
-        });
-    assert_eq!(fee, 50);
+    let fee_config = env
+        .as_contract(&client.address, || env.storage().instance().get(&DataKey::FeeConfig))
+        .expect("fee config set");
+    assert_eq!(fee_config.protocol_fee_bps, 50);
 }
 
 #[test]
@@ -64,7 +63,7 @@ fn old_admin_cannot_authorise_admin_functions_after_rotation() {
 
     // Old-admin-era operations should now be rejected because the active
     // admin (new_admin) has not authorised this invocation.
-    assert!(client.try_set_fee(&100_u32).is_err());
+    assert!(client.try_set_protocol_fee(&100_u32).is_err());
 }
 
 #[test]

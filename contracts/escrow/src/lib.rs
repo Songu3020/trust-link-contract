@@ -9,40 +9,21 @@ pub use crate::errors::ContractError;
 pub use crate::events::{
     AdminRotated, AutoReleased, ContractPausedEvent, ContractUnpausedEvent, DeliveryRecorded,
     DisputeRaised, DisputeResolved, EscrowCancelled, EscrowCompleted, EscrowCreated,
-    EscrowFunded, EscrowShipped, FeeUpdated, FeesWithdrawn,
+    EscrowFunded, EscrowShipped, FeeUpdated, FeesWithdrawn, ArbitrationFeeUpdated,
+    ProtocolFeeUpdated,
     emit_admin_rotated, emit_auto_released, emit_contract_paused, emit_contract_unpaused,
     emit_delivery_recorded, emit_dispute_raised, emit_dispute_resolved, emit_escrow_cancelled,
     emit_escrow_completed, emit_escrow_created, emit_escrow_funded, emit_escrow_shipped,
-    emit_fee_updated, emit_fees_withdrawn,
+    emit_fee_updated, emit_fees_withdrawn, emit_arbitration_fee_updated,
+    emit_protocol_fee_updated,
 };
 pub use crate::types::{
     ContractConfig, ContractStats, DataKey, DisputeData, DisputeStatus, EscrowData, EscrowState,
     FeeConfig, ResolutionType,
 };
 
-/// Maximum protocol fee in basis points (300 = 3%).
-const MAX_FEE_BPS: u32 = 300;
-
-/// Storage keys for persisting escrow data and the global escrow counter.
-#[contracttype]
-pub enum DataKey {
-    Admin,
-    Escrow(u64),
-    EscrowCount,
-    EscrowCounter,
-    FeeCollector,
-    Dispute(u64),
-    ArbitrationFee,
-    TotalArbitrationFees(Address),
-    IsPaused,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[repr(u32)]
-pub enum ResolutionType {
-    Release = 0,
-    Refund = 1,
+/// Maximum fee in basis points (10_000 = 100%).
+const MAX_FEE_BPS: u32 = 10_000;
 const DISPUTE_WINDOW: u64 = 172_800;
 const DEFAULT_TTL_EXTENSION: u32 = 120_960;
 
@@ -102,24 +83,59 @@ fn require_admin(env: &Env) -> Address {
         .expect("not initialized")
 }
 
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum ContractError {
-    InvalidAmount = 1,
-    InsufficientBalance = 2,
-    EscrowNotFound = 3,
-    InvalidState = 4,
-    NotAuthorized = 5,
-    AlreadyInitialized = 6,
-    FeeExceedsMax = 7,
-    EscrowHasNoBuyer = 8,
-    ShippingWindowNotElapsed = 9,
-    InvalidEvidenceHash = 10,
-    DisputeNotFound = 11,
-    ArithmeticError = 12,
-    DisputeWindowClosed = 13,
-    Paused = 14,
+fn default_fee_config() -> FeeConfig {
+    FeeConfig {
+        protocol_fee_bps: 0,
+        arbitration_fee_bps: 0,
+    }
+}
+
+fn read_fee_config(env: &Env) -> FeeConfig {
+    env.storage()
+        .instance()
+        .get(&DataKey::FeeConfig)
+        .unwrap_or_else(|| default_fee_config())
+}
+
+fn write_fee_config(env: &Env, fee_config: &FeeConfig) {
+    env.storage().instance().set(&DataKey::FeeConfig, fee_config);
+}
+
+fn validate_fee_bps(fee_bps: u32) -> Result<(), ContractError> {
+    if fee_bps > MAX_FEE_BPS {
+        return Err(ContractError::FeeExceedsMax);
+    }
+    Ok(())
+}
+
+fn update_protocol_fee(env: &Env, caller: &Address, fee_bps: u32) -> Result<u32, ContractError> {
+    caller.require_auth();
+    let admin = require_admin(env);
+    if caller != &admin {
+        return Err(ContractError::NotAuthorized);
+    }
+    validate_fee_bps(fee_bps)?;
+    let mut config = read_fee_config(env);
+    let old_fee = config.protocol_fee_bps;
+    config.protocol_fee_bps = fee_bps;
+    write_fee_config(env, &config);
+    Ok(old_fee)
+}
+
+fn update_arbitration_fee(env: &Env, caller: &Address, fee_bps: u32) -> Result<u32, ContractError> {
+    caller.require_auth();
+    let admin = require_admin(env);
+    if caller != &admin {
+        return Err(ContractError::NotAuthorized);
+    }
+    validate_fee_bps(fee_bps)?;
+    let mut config = read_fee_config(env);
+    let old_fee = config.arbitration_fee_bps;
+    config.arbitration_fee_bps = fee_bps;
+    write_fee_config(env, &config);
+    Ok(old_fee)
+}
+
 fn get_ttl_extension(env: &Env) -> u32 {
     env.storage()
         .instance()
@@ -199,7 +215,7 @@ impl Escrow {
         env: Env,
         admin: Address,
         fee_collector: Address,
-        arbitration_fee: i128,
+        arbitration_fee_bps: u32,
     ) -> Result<(), ContractError> {
         if env.storage().instance().has(&DataKey::Admin) {
             panic!("already initialized");
@@ -209,10 +225,17 @@ impl Escrow {
         if admin == fee_collector {
             return Err(ContractError::InvalidAddress);
         }
+        validate_fee_bps(arbitration_fee_bps)?;
 
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::FeeCollector, &fee_collector);
-        env.storage().instance().set(&DataKey::ArbitrationFee, &arbitration_fee);
+        write_fee_config(
+            &env,
+            &FeeConfig {
+                protocol_fee_bps: 0,
+                arbitration_fee_bps,
+            },
+        );
         env.storage().instance().set(&DataKey::EscrowCounter, &1u64);
         env.storage().instance().set(&DataKey::Paused, &false);
         Ok(())
@@ -273,26 +296,15 @@ impl Escrow {
 
     /// Updates the default protocol fee. Requires admin auth.
     pub fn set_fee(env: Env, caller: Address, fee_bps: u32) -> Result<(), ContractError> {
-        // SECURITY:
-        // Authenticate before any state reads.
-        caller.require_auth();
-
-        let admin: Address = env
-            .storage()
-            .instance()
-            .get(&DataKey::Admin)
-            .expect("not initialized");
-        
-        if caller != admin {
-            return Err(ContractError::NotAuthorized);
-        }
-
-        if fee_bps > MAX_FEE_BPS {
-            return Err(ContractError::FeeExceedsMax);
-        }
-        let old_fee_bps: u32 = env.storage().instance().get(&DataKey::DefaultFeeBps).unwrap_or(0);
-        env.storage().instance().set(&DataKey::DefaultFeeBps, &fee_bps);
+        let old_fee_bps = update_protocol_fee(&env, &caller, fee_bps)?;
         emit_fee_updated(&env, old_fee_bps, fee_bps);
+        Ok(())
+    }
+
+    /// Updates the protocol fee configuration in basis points. Requires admin auth.
+    pub fn set_protocol_fee(env: Env, caller: Address, fee_bps: u32) -> Result<(), ContractError> {
+        let old_fee_bps = update_protocol_fee(&env, &caller, fee_bps)?;
+        emit_protocol_fee_updated(&env, old_fee_bps, fee_bps);
         Ok(())
     }
 
@@ -316,8 +328,6 @@ impl Escrow {
         Ok(())
     }
 
-    pub fn withdraw_fees(env: Env, token: Address, to: Address, amount: i128) -> Result<(), ContractError> {
-        check_not_paused(&env)?;
     pub fn withdraw_fees(
         env: Env,
         caller: Address,
@@ -362,7 +372,6 @@ impl Escrow {
         fee_bps: u32,
         shipping_window: u64,
     ) -> Result<u64, ContractError> {
-        check_not_paused(&env)?;
         // SECURITY:
         // Authenticate before any state reads.
         seller.require_auth();
@@ -440,7 +449,6 @@ impl Escrow {
     }
 
     pub fn fund_escrow(env: Env, escrow_id: u64, buyer: Address) -> Result<(), ContractError> {
-        check_not_paused(&env)?;
         // SECURITY:
         // Authenticate before any state reads.
         buyer.require_auth();
@@ -494,9 +502,6 @@ impl Escrow {
         Ok(())
     }
 
-    pub fn confirm_delivery(env: Env, escrow_id: u64) -> Result<(), ContractError> {
-        check_not_paused(&env)?;
-        let escrow: EscrowData = env
     /// Admin oracle records delivery timestamp. Only callable from Shipped state.
     pub fn record_delivery(env: Env, caller: Address, escrow_id: u64) -> Result<(), ContractError> {
         // SECURITY:
@@ -565,7 +570,6 @@ impl Escrow {
         description: soroban_sdk::String,
         evidence_hash: soroban_sdk::BytesN<32>,
     ) -> Result<(), ContractError> {
-        check_not_paused(&env)?;
         let escrow: EscrowData = env
             .storage()
             .instance()
@@ -640,17 +644,17 @@ impl Escrow {
             return Err(ContractError::InvalidState);
         }
 
-        let arbitration_fee: i128 = env
-            .storage()
-            .instance()
-            .get(&DataKey::ArbitrationFee)
-            .unwrap_or(0);
+        let arbitration_fee_bps = read_fee_config(&env).arbitration_fee_bps;
+        let arbitration_fee = crate::helpers::payout::calculate_fee(escrow.amount, arbitration_fee_bps)?;
 
-        if escrow.amount < arbitration_fee {
+        if arbitration_fee > escrow.amount {
             return Err(ContractError::InsufficientBalance);
         }
 
-        escrow.amount = escrow.amount.checked_sub(arbitration_fee).ok_or(ContractError::ArithmeticError)?;
+        escrow.amount = escrow
+            .amount
+            .checked_sub(arbitration_fee)
+            .ok_or(ContractError::ArithmeticError)?;
 
         let total_key = DataKey::TotalArbitrationFees(escrow.token.clone());
         let current_total: i128 = env.storage().instance().get(&total_key).unwrap_or(0);
@@ -692,22 +696,14 @@ impl Escrow {
         Ok(())
     }
 
-    pub fn set_arbitration_fee(env: Env, caller: Address, amount: i128) -> Result<(), ContractError> {
-        // SECURITY:
-        // Authenticate before any state reads.
-        caller.require_auth();
-
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("not initialized");
-        if caller != admin {
-            return Err(ContractError::NotAuthorized);
-        }
-
-        env.storage().instance().set(&DataKey::ArbitrationFee, &amount);
+    pub fn set_arbitration_fee(env: Env, caller: Address, fee_bps: u32) -> Result<(), ContractError> {
+        let old_fee_bps = update_arbitration_fee(&env, &caller, fee_bps)?;
+        emit_arbitration_fee_updated(&env, old_fee_bps, fee_bps);
         Ok(())
     }
 
-    pub fn get_arbitration_fee(env: Env) -> i128 {
-        env.storage().instance().get(&DataKey::ArbitrationFee).unwrap_or(0)
+    pub fn get_arbitration_fee(env: Env) -> u32 {
+        read_fee_config(&env).arbitration_fee_bps
     }
 
     pub fn get_total_arbitration_fees(env: Env, token: Address) -> i128 {
@@ -767,17 +763,9 @@ impl Escrow {
         result
     }
 
-    /// Returns the current protocol fee configuration as a read-only view.
+    /// Returns the current fee configuration as a read-only view.
     pub fn get_fee_config(env: Env) -> FeeConfig {
-        let collector: Address = env
-            .storage()
-            .instance()
-            .get(&DataKey::FeeCollector)
-            .expect("fee collector not set");
-        FeeConfig {
-            collector,
-            max_fee_bps: MAX_FEE_BPS,
-        }
+        read_fee_config(&env)
     }
 
     /// Returns the current contract configuration as a read-only view.
@@ -788,11 +776,7 @@ impl Escrow {
             .get(&DataKey::Admin)
             .expect("not initialized");
 
-        let fee_bps: u32 = env
-            .storage()
-            .instance()
-            .get(&DataKey::DefaultFeeBps)
-            .unwrap_or(0);
+        let fee_bps = read_fee_config(&env).protocol_fee_bps;
 
         let fee_collector: Address = env
             .storage()
@@ -825,28 +809,6 @@ impl Escrow {
         }
     }
 
-    pub fn pause_contract(env: Env) {
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("not initialized");
-        admin.require_auth();
-        env.storage().instance().set(&DataKey::IsPaused, &true);
-    }
-
-    pub fn unpause_contract(env: Env) {
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("not initialized");
-        admin.require_auth();
-        env.storage().instance().set(&DataKey::IsPaused, &false);
-    }
-
-    pub fn is_paused(env: Env) -> bool {
-        env.storage().instance().get(&DataKey::IsPaused).unwrap_or(false)
-    }
-}
-
-fn check_not_paused(env: &Env) -> Result<(), ContractError> {
-    if env.storage().instance().get(&DataKey::IsPaused).unwrap_or(false) {
-        return Err(ContractError::Paused);
-    }
-    Ok(())
 }
 
 mod test;
@@ -859,7 +821,7 @@ mod test_pause;
 mod test_overflow;
 mod test_fee_minimum;
 mod test_arbitration_fee;
-mod test_pause;
+mod test_fee_config;
 mod test_helpers;
 mod test_admin;
 mod test_ttl;

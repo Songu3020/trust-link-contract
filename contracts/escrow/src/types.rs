@@ -17,6 +17,7 @@ pub enum DataKey {
     TotalCompleted,
     TotalDisputed,
     TotalRefunded,
+    FeeConfig,
 }
 
 #[contracttype]
@@ -132,14 +133,12 @@ pub struct AdminRotated {
     pub timestamp: u64,
 }
 
-/// Protocol fee configuration.
+/// Protocol and arbitration fee configuration in basis points.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FeeConfig {
-    /// Address that receives protocol fees.
-    pub collector: Address,
-    /// Maximum allowed fee in basis points.
-    pub max_fee_bps: u32,
+    pub protocol_fee_bps: u32,
+    pub arbitration_fee_bps: u32,
 }
 
 #[contracttype]

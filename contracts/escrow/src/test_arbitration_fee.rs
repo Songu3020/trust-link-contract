@@ -33,8 +33,8 @@ fn test_arbitration_fee_deduction_on_resolve_release() {
     let contract_id = env.register(Escrow, ());
     let client = EscrowClient::new(&env, &contract_id);
 
-    let arb_fee = 50_i128;
-    client.initialize(&admin, &fee_collector, &arb_fee);
+    let arb_fee_bps = 500_u32; // 5% of 1000 = 50
+    client.initialize(&admin, &fee_collector, &arb_fee_bps);
 
     let amount = 1000_i128;
     let fee_bps = 200; // 2%
@@ -56,13 +56,13 @@ fn test_arbitration_fee_deduction_on_resolve_release() {
 
     // Initial total arbitration fees should be 0
     assert_eq!(client.get_total_arbitration_fees(&token), 0);
-    assert_eq!(client.get_arbitration_fee(), arb_fee);
+    assert_eq!(client.get_arbitration_fee(), arb_fee_bps);
 
     client.resolve_dispute(&id, &ResolutionType::Release);
 
     // Calculation:
     // 1. amount = 1000
-    // 2. arbitration_fee = 50
+    // 2. arbitration_fee = 50 (5% of 1000)
     // 3. remaining = 1000 - 50 = 950
     // 4. protocol_fee (2% of 950) = 950 * 200 / 10000 = 19
     // 5. final_net = 950 - 19 = 931
@@ -86,8 +86,8 @@ fn test_arbitration_fee_deduction_on_resolve_refund() {
     let contract_id = env.register(Escrow, ());
     let client = EscrowClient::new(&env, &contract_id);
 
-    let arb_fee = 100_i128;
-    client.initialize(&admin, &fee_collector, &arb_fee);
+    let arb_fee_bps = 1000_u32; // 10% of 1000 = 100
+    client.initialize(&admin, &fee_collector, &arb_fee_bps);
 
     let amount = 1000_i128;
     let fee_bps = 300; // 3%
@@ -120,7 +120,7 @@ fn test_arbitration_fee_deduction_on_resolve_refund() {
 
     // Calculation:
     // 1. amount = 1000
-    // 2. arbitration_fee = 100
+    // 2. arbitration_fee = 100 (10% of 1000)
     // 3. remaining = 1000 - 100 = 900
     // 4. protocol_fee (3% of 900) = 900 * 300 / 10000 = 27
     // 5. final_net = 900 - 27 = 873
@@ -138,9 +138,9 @@ fn test_set_and_get_arbitration_fee() {
     let contract_id = env.register(Escrow, ());
     let client = EscrowClient::new(&env, &contract_id);
 
-    client.initialize(&admin, &fee_collector, &50);
+    client.initialize(&admin, &fee_collector, &50_u32);
     assert_eq!(client.get_arbitration_fee(), 50);
 
-    client.set_arbitration_fee(&150);
+    client.set_arbitration_fee(&150_u32);
     assert_eq!(client.get_arbitration_fee(), 150);
 }

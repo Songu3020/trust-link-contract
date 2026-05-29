@@ -1,9 +1,7 @@
 #![cfg(test)]
 
-use crate::{Escrow, EscrowClient, ContractError, EscrowState};
-use soroban_sdk::{testutils::{Address as _, Ledger}, token, Address, Env};
-use super::*;
-use soroban_sdk::{testutils::Address as _, token, Address, Env, String as SorobanString, Symbol};
+use crate::{Escrow, EscrowClient, ResolutionType};
+use soroban_sdk::{testutils::{Address as _, Ledger}, token, Address, Env, String as SorobanString, Symbol};
 
 fn setup_env() -> (Env, Address, Address, Address, Address, Address, Address) {
     let env = Env::default();
@@ -19,7 +17,7 @@ fn setup_env() -> (Env, Address, Address, Address, Address, Address, Address) {
     let token_address = env.register_stellar_asset_contract(token_admin.clone());
     let contract_id = env.register(Escrow, ());
     let client = EscrowClient::new(&env, &contract_id);
-    client.initialize(&admin, &fee_collector, &0_i128);
+    client.initialize(&admin, &fee_collector, &0_u32);
 
     (env, admin, seller, buyer, resolver, token_address, contract_id)
 }
@@ -41,7 +39,8 @@ fn test_pause_blocks_mutations_but_keeps_views_available() {
 
     // View functions still work while paused
     let config = client.get_fee_config();
-    assert_eq!(config.max_fee_bps, 300);
+    assert_eq!(config.protocol_fee_bps, 0);
+    assert_eq!(config.arbitration_fee_bps, 0);
 
     // Mutating functions are blocked while paused
     assert!(client.try_withdraw_fees(&admin, &token, &admin, &1_i128).is_err());

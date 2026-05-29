@@ -15,7 +15,7 @@ fn test_initialize_same_admin_and_fee_collector_reverts() {
     let client = EscrowClient::new(&env, &contract_id);
     let shared = Address::generate(&env);
 
-    let result = client.try_initialize(&shared, &shared, &0_i128);
+    let result = client.try_initialize(&shared, &shared, &0_u32);
     assert!(matches!(result, Err(Ok(ContractError::InvalidAddress))));
 }
 

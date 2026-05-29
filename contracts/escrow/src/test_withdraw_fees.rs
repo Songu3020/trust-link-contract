@@ -41,7 +41,7 @@ fn test_withdraw_fees_after_multiple_escrows() {
     let contract_id = env.register(Escrow, ());
     let client = EscrowClient::new(&env, &contract_id);
 
-    client.initialize(&admin, &fee_collector, &0_i128);
+    client.initialize(&admin, &fee_collector, &0_u32);
 
     mint_tokens(&env, &token, &buyer, 3000);
 
@@ -77,7 +77,7 @@ fn test_withdraw_fees_multiple_tokens() {
     let contract_id = env.register(Escrow, ());
     let client = EscrowClient::new(&env, &contract_id);
 
-    client.initialize(&admin, &fee_collector, &0_i128);
+    client.initialize(&admin, &fee_collector, &0_u32);
 
     // Register a second token
     let token_admin_b = Address::generate(&env);
@@ -115,4 +115,3 @@ fn test_withdraw_fees_multiple_tokens() {
     assert_eq!(token::Client::new(&env, &token_b).balance(&to), 40);
     assert_eq!(token::Client::new(&env, &token_b).balance(&contract_id), 0);
 }
-
