@@ -29,37 +29,6 @@ const MAX_FEE_BPS: u32 = 300;
 /// Prevents dust transactions and ensures meaningful escrow values.
 pub const MIN_ESCROW_AMOUNT: i128 = 1_000_000;
 
-/// Storage keys for persisting escrow data and the global escrow counter.
-#[contracttype]
-pub enum DataKey {
-    /// Stores the admin address with permission to manage contract operations.
-    Admin,
-    /// Stores individual escrow data by escrow ID.
-    Escrow(u64),
-    /// Legacy key; use EscrowCounter instead.
-    EscrowCount,
-    /// Stores the current escrow counter for generating unique escrow IDs.
-    EscrowCounter,
-    /// Stores the fee collector address that receives protocol and arbitration fees.
-    FeeCollector,
-    /// Stores dispute data for a specific escrow ID.
-    Dispute(u64),
-    /// Stores the global arbitration fee in basis points.
-    ArbitrationFee,
-    /// Stores the total arbitration fees accumulated by a specific address.
-    TotalArbitrationFees(Address),
-    /// Stores the contract pause state (true = paused, false = active).
-    IsPaused,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[repr(u32)]
-pub enum ResolutionType {
-    Release = 0,
-    Refund = 1,
-}
-
 const DISPUTE_WINDOW: u64 = 172_800;
 const DEFAULT_TTL_EXTENSION: u32 = 120_960;
 
@@ -124,24 +93,6 @@ fn require_admin(env: &Env) -> Address {
         .expect("not initialized")
 }
 
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum ContractError {
-    InvalidAmount = 1,
-    InsufficientBalance = 2,
-    EscrowNotFound = 3,
-    InvalidState = 4,
-    NotAuthorized = 5,
-    AlreadyInitialized = 6,
-    FeeExceedsMax = 7,
-    EscrowHasNoBuyer = 8,
-    ShippingWindowNotElapsed = 9,
-    InvalidEvidenceHash = 10,
-    DisputeNotFound = 11,
-    ArithmeticError = 12,
-    DisputeWindowClosed = 13,
-    Paused = 14,
 fn default_fee_config() -> FeeConfig {
     FeeConfig {
         protocol_fee_bps: 0,
@@ -240,6 +191,17 @@ fn load_dispute(env: &Env, id: u64) -> Result<DisputeData, ContractError> {
     Ok(dispute)
 }
 
+/// Deducts the protocol fee from `amount` and transfers the net to `recipient`,
+/// leaving the fee in the contract vault for the admin to sweep via
+/// `withdraw_fees`.
+///
+/// Rounding policy: **floor** — `fee = floor(amount * fee_bps / 10_000)` and
+/// `net = amount - fee`, so the truncated remainder accrues to `recipient` and
+/// the invariant `net + fee == amount` always holds (no stranded dust). This
+/// mirrors [`helpers::payout::calculate_fee`]; the two implementations must stay
+/// in sync. The calculation is split to avoid overflowing `i128` for large
+/// amounts. Overflow surfaces as `ArithmeticError` (distinct from the helper's
+/// `ArithmeticOverflow`).
 fn deduct_and_transfer(env: &Env, token_addr: &Address, recipient: &Address, amount: i128, fee_bps: u32) -> Result<(), ContractError> {
     if amount < 0 {
         return Err(ContractError::InvalidAmount);
