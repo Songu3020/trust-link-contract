@@ -22,8 +22,31 @@ pub use crate::types::{
     FeeConfig, ResolutionType,
 };
 
-/// Maximum fee in basis points (10_000 = 100%).
-const MAX_FEE_BPS: u32 = 10_000;
+/// Maximum protocol fee in basis points (300 = 3%).
+const MAX_FEE_BPS: u32 = 300;
+
+/// Storage keys for persisting escrow data and the global escrow counter.
+#[contracttype]
+pub enum DataKey {
+    Admin,
+    Escrow(u64),
+    EscrowCount,
+    EscrowCounter,
+    FeeCollector,
+    Dispute(u64),
+    ArbitrationFee,
+    TotalArbitrationFees(Address),
+    IsPaused,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[repr(u32)]
+pub enum ResolutionType {
+    Release = 0,
+    Refund = 1,
+}
+
 const DISPUTE_WINDOW: u64 = 172_800;
 const DEFAULT_TTL_EXTENSION: u32 = 120_960;
 
@@ -83,6 +106,24 @@ fn require_admin(env: &Env) -> Address {
         .expect("not initialized")
 }
 
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum ContractError {
+    InvalidAmount = 1,
+    InsufficientBalance = 2,
+    EscrowNotFound = 3,
+    InvalidState = 4,
+    NotAuthorized = 5,
+    AlreadyInitialized = 6,
+    FeeExceedsMax = 7,
+    EscrowHasNoBuyer = 8,
+    ShippingWindowNotElapsed = 9,
+    InvalidEvidenceHash = 10,
+    DisputeNotFound = 11,
+    ArithmeticError = 12,
+    DisputeWindowClosed = 13,
+    Paused = 14,
 fn default_fee_config() -> FeeConfig {
     FeeConfig {
         protocol_fee_bps: 0,
@@ -820,6 +861,7 @@ mod test_resolution;
 mod test_pause;
 mod test_overflow;
 mod test_fee_minimum;
+mod test_fee_calculation_accuracy;
 mod test_arbitration_fee;
 mod test_fee_config;
 mod test_helpers;
