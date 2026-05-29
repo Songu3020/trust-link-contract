@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use crate::test_helpers::{advance_time, create_funded_escrow, setup_contract};
-use crate::{DeliveryRecorded, EscrowState};
+use crate::{ContractError, DeliveryRecorded, EscrowState};
 use soroban_sdk::{
     testutils::Address as _, vec, Address, Env, IntoVal, String as SorobanString, Symbol,
     TryFromVal, Val,
@@ -41,7 +41,7 @@ fn test_mark_shipped_transitions_state() {
         &env, &client, &seller, &buyer, &resolver, &token, 1000, 100, 3600,
     );
 
-    client.mark_shipped(&id, &SorobanString::from_str(&env, "TRACK001"));
+    client.mark_shipped(&seller, &id, &SorobanString::from_str(&env, "TRACK-001"));
 
     assert!(has_event::<crate::EscrowShipped, _>(&env, &contract_id, "escrow_shipped", |event| {
         event.escrow_id == id && event.seller == seller
@@ -49,6 +49,28 @@ fn test_mark_shipped_transitions_state() {
 
     let escrow = client.get_escrow(&id);
     assert_eq!(escrow.state, EscrowState::Shipped);
+    assert_eq!(escrow.tracking_id, Some(SorobanString::from_str(&env, "TRACK-001")));
+}
+
+#[test]
+fn test_mark_shipped_rejects_empty_tracking_id() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let token = register_token(&env);
+    let (_contract_id, client, _admin, _fee_collector) = setup_contract(&env);
+
+    let seller = Address::generate(&env);
+    let buyer = Address::generate(&env);
+    let resolver = Address::generate(&env);
+
+    let id = create_funded_escrow(&env, &client, &seller, &buyer, &resolver, &token, 1000, 100, 3600);
+
+    let res = client.try_mark_shipped(&seller, &id, &SorobanString::from_str(&env, ""));
+    assert!(matches!(res, Err(Ok(ContractError::InvalidTrackingId))));
+
+    let escrow = client.get_escrow(&id);
+    assert_eq!(escrow.state, EscrowState::Funded);
 }
 
 #[test]
@@ -57,7 +79,7 @@ fn test_record_delivery_sets_timestamp() {
     env.mock_all_auths();
 
     let token = register_token(&env);
-    let (contract_id, client, _admin, _fee_collector) = setup_contract(&env);
+    let (contract_id, client, admin, _fee_collector) = setup_contract(&env);
 
     let seller = Address::generate(&env);
     let buyer = Address::generate(&env);
@@ -67,12 +89,12 @@ fn test_record_delivery_sets_timestamp() {
         &env, &client, &seller, &buyer, &resolver, &token, 1000, 100, 3600,
     );
 
-    client.mark_shipped(&id, &SorobanString::from_str(&env, "TRACK001"));
+    client.mark_shipped(&seller, &id, &SorobanString::from_str(&env, "TRACK-002"));
 
     advance_time(&env, 60);
     let expected_ts = env.ledger().timestamp();
 
-    client.record_delivery(&id);
+    client.record_delivery(&admin, &id);
 
     assert!(has_event::<DeliveryRecorded, _>(&env, &contract_id, "delivery_recorded", |event| {
         event.escrow_id == id && event.delivered_at == expected_ts
@@ -89,7 +111,7 @@ fn test_record_delivery_requires_shipped_state() {
     env.mock_all_auths();
 
     let token = register_token(&env);
-    let (_contract_id, client, _admin, _fee_collector) = setup_contract(&env);
+    let (_contract_id, client, admin, _fee_collector) = setup_contract(&env);
 
     let seller = Address::generate(&env);
     let buyer = Address::generate(&env);
@@ -99,8 +121,7 @@ fn test_record_delivery_requires_shipped_state() {
         &env, &client, &seller, &buyer, &resolver, &token, 1000, 100, 3600,
     );
 
-    // Not marked shipped — should return InvalidState
-    let res = client.try_record_delivery(&id);
+    let res = client.try_record_delivery(&admin, &id);
     assert!(matches!(res, Err(Ok(crate::ContractError::InvalidState))));
 }
 
@@ -120,9 +141,9 @@ fn test_confirm_delivery_after_mark_shipped() {
         &env, &client, &seller, &buyer, &resolver, &token, 1000, 0, 3600,
     );
 
-    client.mark_shipped(&id, &SorobanString::from_str(&env, "TRACK001"));
+    client.mark_shipped(&seller, &id, &SorobanString::from_str(&env, "TRACK-003"));
     advance_time(&env, 172801);
-    client.confirm_delivery(&id);
+    client.confirm_delivery(&buyer, &id);
 
     assert!(has_event::<crate::EscrowCompleted, _>(&env, &contract_id, "escrow_completed", |event| {
         event.escrow_id == id && event.recipient == seller
