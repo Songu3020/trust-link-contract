@@ -22,6 +22,12 @@ pub use crate::types::{
     FeeConfig, ResolutionType,
 };
 
+/// Maximum protocol fee in basis points (300 = 3%).
+const MAX_FEE_BPS: u32 = 300;
+
+/// Minimum escrow amount in stroops (1 USDC = 1,000,000 stroops).
+/// Prevents dust transactions and ensures meaningful escrow values.
+pub const MIN_ESCROW_AMOUNT: i128 = 1_000_000;
 /// Maximum escrow fee in basis points (300 = 3%).
 ///
 /// This applies to the per-escrow `fee_bps` value supplied at creation time,
@@ -223,6 +229,17 @@ fn load_dispute(env: &Env, id: u64) -> Result<DisputeData, ContractError> {
     Ok(dispute)
 }
 
+/// Deducts the protocol fee from `amount` and transfers the net to `recipient`,
+/// leaving the fee in the contract vault for the admin to sweep via
+/// `withdraw_fees`.
+///
+/// Rounding policy: **floor** — `fee = floor(amount * fee_bps / 10_000)` and
+/// `net = amount - fee`, so the truncated remainder accrues to `recipient` and
+/// the invariant `net + fee == amount` always holds (no stranded dust). This
+/// mirrors [`helpers::payout::calculate_fee`]; the two implementations must stay
+/// in sync. The calculation is split to avoid overflowing `i128` for large
+/// amounts. Overflow surfaces as `ArithmeticError` (distinct from the helper's
+/// `ArithmeticOverflow`).
 fn deduct_and_transfer(env: &Env, token_addr: &Address, recipient: &Address, amount: i128, fee_bps: u32) -> Result<(), ContractError> {
     if amount < 0 {
         return Err(ContractError::InvalidAmount);
