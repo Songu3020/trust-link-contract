@@ -35,10 +35,10 @@ fn test_set_ttl_extension_persists() {
     env.mock_all_auths();
 
     let token = register_token(&env);
-    let (_contract_id, client, _admin, _fee_collector) = setup_contract(&env);
+    let (_contract_id, client, admin, _fee_collector) = setup_contract(&env);
 
     // Configure custom TTL extension
-    client.set_ttl_extension(&60_480_u32);
+    client.set_ttl_extension(&admin, &60_480_u32);
 
     let seller = Address::generate(&env);
     let buyer = Address::generate(&env);
@@ -67,8 +67,10 @@ fn test_dispute_stored_in_persistent_storage() {
     let id = create_funded_escrow(
         &env, &client, &seller, &buyer, &resolver, &token, 1000, 100, 3600,
     );
+    client.mark_shipped(&seller, &id, &soroban_sdk::String::from_str(&env, "TRACK-TTL"));
 
     client.raise_dispute(
+        &buyer,
         &id,
         &soroban_sdk::Symbol::new(&env, "test"),
         &soroban_sdk::String::from_str(&env, "desc"),
@@ -77,5 +79,7 @@ fn test_dispute_stored_in_persistent_storage() {
 
     // Dispute readable from persistent storage
     let dispute = client.get_dispute(&id);
+    assert!(dispute.is_some());
+    let dispute = dispute.unwrap();
     assert_eq!(dispute.escrow_id, id);
 }

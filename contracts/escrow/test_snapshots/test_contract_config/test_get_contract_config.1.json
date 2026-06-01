@@ -15,8 +15,11 @@
           "function": {
             "contract_fn": {
               "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "set_fee",
+              "function_name": "set_protocol_fee",
               "args": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                },
                 {
                   "u32": 150
                 }
@@ -178,6 +181,14 @@
                   },
                   {
                     "key": {
+                      "symbol": "shipped_at"
+                    },
+                    "val": {
+                      "u64": "0"
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "shipping_window"
                     },
                     "val": {
@@ -249,30 +260,6 @@
                       "key": {
                         "vec": [
                           {
-                            "symbol": "ArbitrationFee"
-                          }
-                        ]
-                      },
-                      "val": {
-                        "i128": "5000000000"
-                      }
-                    },
-                    {
-                      "key": {
-                        "vec": [
-                          {
-                            "symbol": "DefaultFeeBps"
-                          }
-                        ]
-                      },
-                      "val": {
-                        "u32": 150
-                      }
-                    },
-                    {
-                      "key": {
-                        "vec": [
-                          {
                             "symbol": "EscrowCounter"
                           }
                         ]
@@ -297,12 +284,53 @@
                       "key": {
                         "vec": [
                           {
+                            "symbol": "FeeConfig"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "map": [
+                          {
+                            "key": {
+                              "symbol": "arbitration_fee_bps"
+                            },
+                            "val": {
+                              "u32": 500
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "protocol_fee_bps"
+                            },
+                            "val": {
+                              "u32": 150
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
                             "symbol": "Paused"
                           }
                         ]
                       },
                       "val": {
                         "bool": false
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "TotalCreated"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "u64": "1"
                       }
                     }
                   ]

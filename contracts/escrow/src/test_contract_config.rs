@@ -13,9 +13,9 @@ fn test_get_contract_config() {
 
     let admin = Address::generate(&env);
     let fee_collector = Address::generate(&env);
-    let arbitration_fee = 500_0000000;
+    let arbitration_fee_bps = 500;
 
-    client.initialize(&admin, &fee_collector, &arbitration_fee);
+    client.initialize(&admin, &fee_collector, &arbitration_fee_bps);
 
     // Default fee_bps should be 0 initially
     let mut config = client.get_contract_config();
@@ -25,7 +25,7 @@ fn test_get_contract_config() {
     assert_eq!(config.escrow_count, 0);
 
     // Update fee and check again
-    client.set_fee(&150);
+    client.set_protocol_fee(&admin, &150);
     config = client.get_contract_config();
     assert_eq!(config.fee_bps, 150);
     

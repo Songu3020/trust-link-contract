@@ -53,18 +53,6 @@
                       "key": {
                         "vec": [
                           {
-                            "symbol": "ArbitrationFee"
-                          }
-                        ]
-                      },
-                      "val": {
-                        "i128": "42"
-                      }
-                    },
-                    {
-                      "key": {
-                        "vec": [
-                          {
                             "symbol": "EscrowCounter"
                           }
                         ]
@@ -83,6 +71,35 @@
                       },
                       "val": {
                         "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "FeeConfig"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "map": [
+                          {
+                            "key": {
+                              "symbol": "arbitration_fee_bps"
+                            },
+                            "val": {
+                              "u32": 42
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "protocol_fee_bps"
+                            },
+                            "val": {
+                              "u32": 0
+                            }
+                          }
+                        ]
                       }
                     },
                     {

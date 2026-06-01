@@ -35,37 +35,57 @@ fn mint_tokens(env: &Env, token: &Address, to: &Address, amount: i128) {
 }
 
 #[test]
-fn test_fee_calculation_max_i128() {
+fn test_fee_calculation_max_escrow_amount() {
     let (env, seller, buyer, resolver, _admin, token, fee_collector) = setup_env();
 
     let contract_id = env.register(Escrow, ());
     let client = super::EscrowClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
-    client.initialize(&admin, &fee_collector, &0_i128);
+    client.initialize(&admin, &fee_collector, &0_u32);
+    client.set_protocol_fee(&admin, &300_u32);
 
-    let amount = i128::MAX;
+    let amount = MAX_ESCROW_AMOUNT;
     let fee_bps = 300; // 3%
 
-    let id = client.create_escrow(&seller, &resolver, &token, &amount, &fee_bps, &3600_u64);
+    let id = client.create_escrow(&seller, &None::<Address>, &resolver, &token, &amount, &fee_bps, &3600_u64);
 
     mint_tokens(&env, &token, &buyer, amount);
     client.fund_escrow(&id, &buyer);
 
-    // Set ledger time to after dispute deadline to allow confirm_delivery
-    env.ledger().set_timestamp(172800 + 1);
+    client.mark_shipped(&seller, &id, &soroban_sdk::String::from_str(&env, "TRACK-MAX"));
 
+    let escrow = client.get_escrow(&id);
+    env.ledger().set_timestamp(escrow.dispute_deadline + 1);
     // This should not panic because of split calculation
-    client.confirm_delivery(&id);
+    client.confirm_delivery(&buyer, &id);
 
     let escrow = client.get_escrow(&id);
     assert_eq!(escrow.state, EscrowState::Completed);
 
-    let expected_fee = (i128::MAX / 10_000) * 300 + (i128::MAX % 10_000) * 300 / 10_000;
-    let expected_net = i128::MAX - expected_fee;
+    let expected_fee = (MAX_ESCROW_AMOUNT / 10_000) * 300 + (MAX_ESCROW_AMOUNT % 10_000) * 300 / 10_000;
+    let expected_net = MAX_ESCROW_AMOUNT - expected_fee;
 
     let tc = soroban_sdk::token::Client::new(&env, &token);
     assert_eq!(tc.balance(&seller), expected_net);
-    assert_eq!(tc.balance(&contract_id), expected_fee);
+    assert_eq!(tc.balance(&fee_collector), expected_fee);
+    assert_eq!(tc.balance(&contract_id), 0);
+}
+
+#[test]
+fn test_create_escrow_amount_exceeds_maximum() {
+    let (env, seller, _buyer, resolver, _admin, token, fee_collector) = setup_env();
+
+    let contract_id = env.register(Escrow, ());
+    let client = super::EscrowClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &fee_collector, &0_u32);
+
+    let amount = MAX_ESCROW_AMOUNT + 1;
+    let res = client.try_create_escrow(&seller, &resolver, &token, &amount, &300, &3600_u64);
+    assert_eq!(res, Err(Ok(ContractError::AmountExceedsMaximum)));
+
+    let res2 = client.try_create_escrow(&seller, &resolver, &token, &i128::MAX, &300, &3600_u64);
+    assert_eq!(res2, Err(Ok(ContractError::AmountExceedsMaximum)));
 }
 
 #[test]
@@ -75,12 +95,12 @@ fn test_create_escrow_invalid_amount() {
     let contract_id = env.register(Escrow, ());
     let client = super::EscrowClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
-    client.initialize(&admin, &fee_collector, &0_i128);
+    client.initialize(&admin, &fee_collector, &0_u32);
 
-    let res = client.try_create_escrow(&seller, &resolver, &token, &0, &200, &3600);
+    let res = client.try_create_escrow(&seller, &None::<Address>, &resolver, &token, &0, &200, &3600);
     assert!(matches!(res, Err(Ok(ContractError::InvalidAmount))));
 
-    let res2 = client.try_create_escrow(&seller, &resolver, &token, &-1, &200, &3600);
+    let res2 = client.try_create_escrow(&seller, &None::<Address>, &resolver, &token, &-1, &200, &3600);
     assert!(matches!(res2, Err(Ok(ContractError::InvalidAmount))));
 }
 
@@ -91,9 +111,10 @@ fn test_fee_exceeds_max_clean_error() {
     let contract_id = env.register(Escrow, ());
     let client = super::EscrowClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
-    client.initialize(&admin, &fee_collector, &0_i128);
+    client.initialize(&admin, &fee_collector, &0_u32);
 
-    let res = client.try_create_escrow(&seller, &resolver, &token, &1000, &301, &3600);
+    let res = client.try_create_escrow(&seller, &None::<Address>, &resolver, &token, &1000, &301, &3600);
+    let res = client.try_create_escrow(&seller, &resolver, &token, &1000, &10_001, &3600);
     assert!(matches!(res, Err(Ok(ContractError::FeeExceedsMax))));
 }
 
@@ -103,14 +124,16 @@ fn test_addition_overflow_escrow_counter() {
     let contract_id = env.register(Escrow, ());
     let client = super::EscrowClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
-    client.initialize(&admin, &fee_collector, &0_i128);
+    client.initialize(&admin, &fee_collector, &0_u32);
     
     env.as_contract(&contract_id, || {
         env.storage().instance().set(&DataKey::EscrowCounter, &u64::MAX);
     });
     
-    let res = client.try_create_escrow(&seller, &resolver, &token, &1000, &300, &3600);
+    let res = client.try_create_escrow(&seller, &None::<Address>, &resolver, &token, &1000, &300, &3600);
     assert_eq!(res, Err(Ok(ContractError::ArithmeticOverflow)));
+    let res = client.try_create_escrow(&seller, &resolver, &token, &1000, &300, &3600);
+    assert_eq!(res, Err(Ok(ContractError::ArithmeticError)));
 }
 
 #[test]
@@ -119,16 +142,20 @@ fn test_addition_overflow_shipping_window() {
     let contract_id = env.register(Escrow, ());
     let client = super::EscrowClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
-    client.initialize(&admin, &fee_collector, &0_i128);
+    client.initialize(&admin, &fee_collector, &0_u32);
     
     let amount = 1000;
     mint_tokens(&env, &token, &buyer, amount);
     
-    let escrow_id = client.create_escrow(&seller, &resolver, &token, &amount, &300, &u64::MAX);
+    let escrow_id = client.create_escrow(&seller, &None::<Address>, &resolver, &token, &amount, &300, &u64::MAX);
     env.ledger().set_timestamp(1000);
+    let escrow_id = client.create_escrow(&seller, &resolver, &token, &amount, &300, &u64::MAX);
     client.fund_escrow(&escrow_id, &buyer);
-    
-    env.ledger().set_timestamp(173801);
+    client.mark_shipped(&seller, &escrow_id, &soroban_sdk::String::from_str(&env, "TRACK-OVERFLOW"));
+    env.ledger().set_timestamp(u64::MAX - 10);
+    client.record_delivery(&admin, &escrow_id);
+
+    env.ledger().set_timestamp(u64::MAX - 1);
     let res = client.try_auto_release(&escrow_id);
     assert_eq!(res, Err(Ok(ContractError::ArithmeticOverflow)));
 }
@@ -153,7 +180,7 @@ fn test_multiplication_overflow() {
     let fee_bps = u32::MAX;
     
     let res = super::deduct_and_transfer(&env, &token, &recipient, amount, fee_bps);
-    assert_eq!(res, Err(ContractError::ArithmeticOverflow));
+    assert_eq!(res, Err(ContractError::ArithmeticError));
 }
 
 #[test]

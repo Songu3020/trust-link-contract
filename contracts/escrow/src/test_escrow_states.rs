@@ -26,7 +26,6 @@ fn legal_transitions_are_accepted() {
         (EscrowState::Pending, EscrowState::Funded),
         (EscrowState::Pending, EscrowState::Canceled),
         (EscrowState::Funded, EscrowState::Shipped),
-        (EscrowState::Funded, EscrowState::Disputed),
         (EscrowState::Funded, EscrowState::Completed),
         (EscrowState::Funded, EscrowState::Refunded),
         (EscrowState::Shipped, EscrowState::Completed),
@@ -58,6 +57,8 @@ fn illegal_transitions_are_rejected() {
         (EscrowState::Pending, EscrowState::Completed),
         // Cannot un-cancel.
         (EscrowState::Canceled, EscrowState::Pending),
+        // Disputes are only opened once the escrow has shipped.
+        (EscrowState::Funded, EscrowState::Disputed),
         // Cannot dispute a Pending escrow that was never funded.
         (EscrowState::Pending, EscrowState::Disputed),
     ];

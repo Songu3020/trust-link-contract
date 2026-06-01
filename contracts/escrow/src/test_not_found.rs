@@ -30,7 +30,8 @@ fn test_mark_shipped_not_found() {
     let env = Env::default();
     env.mock_all_auths();
     let (_contract_id, client, _admin, _fee_collector) = setup_contract(&env);
-    let res = client.try_mark_shipped(&MISSING_ID, &SorobanString::from_str(&env, "TRACK"));
+    let seller = Address::generate(&env);
+    let res = client.try_mark_shipped(&seller, &MISSING_ID, &SorobanString::from_str(&env, "TRACK"));
     assert!(matches!(res, Err(Ok(ContractError::EscrowNotFound))));
 }
 
@@ -39,7 +40,8 @@ fn test_confirm_delivery_not_found() {
     let env = Env::default();
     env.mock_all_auths();
     let (_contract_id, client, _admin, _fee_collector) = setup_contract(&env);
-    let res = client.try_confirm_delivery(&MISSING_ID);
+    let buyer = Address::generate(&env);
+    let res = client.try_confirm_delivery(&buyer, &MISSING_ID);
     assert!(matches!(res, Err(Ok(ContractError::EscrowNotFound))));
 }
 
@@ -48,7 +50,9 @@ fn test_raise_dispute_not_found() {
     let env = Env::default();
     env.mock_all_auths();
     let (_contract_id, client, _admin, _fee_collector) = setup_contract(&env);
+    let buyer = Address::generate(&env);
     let res = client.try_raise_dispute(
+        &buyer,
         &MISSING_ID,
         &Symbol::new(&env, "reason"),
         &SorobanString::from_str(&env, "desc"),
@@ -62,6 +66,7 @@ fn test_resolve_dispute_not_found() {
     let env = Env::default();
     env.mock_all_auths();
     let (_contract_id, client, _admin, _fee_collector) = setup_contract(&env);
-    let res = client.try_resolve_dispute(&MISSING_ID, &crate::ResolutionType::Release);
+    let resolver = Address::generate(&env);
+    let res = client.try_resolve_dispute(&resolver, &MISSING_ID, &crate::ResolutionType::Release);
     assert!(matches!(res, Err(Ok(ContractError::EscrowNotFound))));
 }

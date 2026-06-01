@@ -19,7 +19,7 @@ struct Fx {
     client: EscrowClient<'static>,
     escrow_id: u64,
     seller: Address,
-    funded_at: u64,
+    delivered_at: u64,
     token_addr: Address,
 }
 
@@ -38,33 +38,33 @@ fn setup_funded_and_shipped() -> Fx {
 
     let contract_id = env.register(Escrow, ());
     let client = EscrowClient::new(&env, &contract_id);
-    client.initialize(&admin, &fee_collector, &0_i128);
+    client.initialize(&admin, &fee_collector, &0_u32);
 
     let amount: i128 = 1_000;
     // shipping_window=0 isolates the dispute-window assertion the issue cares about.
     let escrow_id = client.create_escrow(&seller, &resolver, &token_addr, &amount, &0_u32, &0_u64);
     token::StellarAssetClient::new(&env, &token_addr).mint(&buyer, &amount);
     client.fund_escrow(&escrow_id, &buyer);
-    client.mark_shipped(&escrow_id, &soroban_sdk::String::from_str(&env, "TRACK001"));
+    client.mark_shipped(&seller, &escrow_id, &soroban_sdk::String::from_str(&env, "TRACK001"));
+    env.ledger().set_timestamp(1_700_000_000);
+    client.record_delivery(&admin, &escrow_id);
 
-    // The contract sets dispute_deadline = funded_at + DISPUTE_WINDOW; pin
-    // funded_at so the assertions below are unambiguous.
     use crate::{DataKey, EscrowData};
     let data: EscrowData = env
         .as_contract(&client.address, || env.storage().persistent().get(&DataKey::Escrow(escrow_id)))
         .expect("escrow exists");
-    Fx { env, client, escrow_id, seller, funded_at: data.funded_at, token_addr }
+    Fx { env, client, escrow_id, seller, delivered_at: data.delivered_at, token_addr }
 }
 
 #[test]
 fn auto_release_before_48_hours_is_rejected() {
     let fx = setup_funded_and_shipped();
     // One second before the 48h window closes.
-    fx.env.ledger().with_mut(|li| li.timestamp = fx.funded_at + DISPUTE_WINDOW_SECS - 1);
+    fx.env.ledger().with_mut(|li| li.timestamp = fx.delivered_at + DISPUTE_WINDOW_SECS - 1);
 
     assert_eq!(
         fx.client.try_auto_release(&fx.escrow_id),
-        Err(Ok(ContractError::DisputeWindowClosed)),
+        Err(Ok(ContractError::ShippingWindowNotElapsed)),
         "auto_release must be rejected while the dispute window is still open",
     );
 }
@@ -73,7 +73,7 @@ fn auto_release_before_48_hours_is_rejected() {
 fn auto_release_after_48_hours_succeeds_and_pays_the_seller() {
     let fx = setup_funded_and_shipped();
     // One second past the 48h window.
-    fx.env.ledger().with_mut(|li| li.timestamp = fx.funded_at + DISPUTE_WINDOW_SECS + 1);
+    fx.env.ledger().with_mut(|li| li.timestamp = fx.delivered_at + DISPUTE_WINDOW_SECS + 1);
 
     fx.client.auto_release(&fx.escrow_id);
 

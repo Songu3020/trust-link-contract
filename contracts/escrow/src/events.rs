@@ -30,6 +30,46 @@ pub fn emit_fee_updated(env: &Env, old_fee_bps: u32, new_fee_bps: u32) {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProtocolFeeUpdated {
+    pub old_fee_bps: u32,
+    pub new_fee_bps: u32,
+    pub timestamp: u64,
+}
+
+/// Topic: `(\"protocol_fee_updated\",)`, data: `ProtocolFeeUpdated`.
+pub fn emit_protocol_fee_updated(env: &Env, old_fee_bps: u32, new_fee_bps: u32) {
+    env.events().publish(
+        (Symbol::new(env, "protocol_fee_updated"),),
+        ProtocolFeeUpdated {
+            old_fee_bps,
+            new_fee_bps,
+            timestamp: env.ledger().timestamp(),
+        },
+    );
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ArbitrationFeeUpdated {
+    pub old_fee_bps: u32,
+    pub new_fee_bps: u32,
+    pub timestamp: u64,
+}
+
+/// Topic: `(\"arbitration_fee_updated\",)`, data: `ArbitrationFeeUpdated`.
+pub fn emit_arbitration_fee_updated(env: &Env, old_fee_bps: u32, new_fee_bps: u32) {
+    env.events().publish(
+        (Symbol::new(env, "arbitration_fee_updated"),),
+        ArbitrationFeeUpdated {
+            old_fee_bps,
+            new_fee_bps,
+            timestamp: env.ledger().timestamp(),
+        },
+    );
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AdminRotated {
     pub old_admin: Address,
     pub new_admin: Address,
@@ -242,7 +282,7 @@ pub struct DisputeRaised {
     pub reason: Symbol,
     pub description: String,
     pub evidence_hash: BytesN<32>,
-    pub raised_at: u64,
+    pub disputed_at: u64,
 }
 
 /// Topic: `(\"dispute_raised\",)`, data: `DisputeRaised`.
@@ -262,7 +302,7 @@ pub fn emit_dispute_raised(
             reason,
             description,
             evidence_hash,
-            raised_at: env.ledger().timestamp(),
+            disputed_at: env.ledger().timestamp(),
         },
     );
 }

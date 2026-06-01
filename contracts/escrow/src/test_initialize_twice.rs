@@ -16,7 +16,7 @@ fn deploy_and_init(env: &Env) -> (EscrowClient, Address, Address) {
     let fee_collector_a = Address::generate(env);
     let contract_id = env.register(Escrow, ());
     let client = EscrowClient::new(env, &contract_id);
-    client.initialize(&admin_a, &fee_collector_a, &42_i128);
+    client.initialize(&admin_a, &fee_collector_a, &42_u32);
     (client, admin_a, fee_collector_a)
 }
 
@@ -28,7 +28,7 @@ fn second_initialize_reverts() {
     let admin_b = Address::generate(&env);
     let fee_collector_b = Address::generate(&env);
     // Second call must revert.
-    client.initialize(&admin_b, &fee_collector_b, &99_i128);
+    client.initialize(&admin_b, &fee_collector_b, &99_u32);
 }
 
 #[test]
@@ -40,7 +40,7 @@ fn storage_from_the_first_initialize_is_unchanged_after_a_failed_second_call() {
 
     // Use `try_initialize` so the host-side contract panic comes back as Err
     // and the test can keep running to verify the storage invariant.
-    let res = client.try_initialize(&admin_b, &fee_collector_b, &99_i128);
+    let res = client.try_initialize(&admin_b, &fee_collector_b, &99_u32);
     assert!(res.is_err(), "second initialize must revert");
 
     // Storage still reflects the first call's values.
@@ -50,13 +50,11 @@ fn storage_from_the_first_initialize_is_unchanged_after_a_failed_second_call() {
     let stored_collector: Address = env
         .as_contract(&client.address, || env.storage().instance().get(&DataKey::FeeCollector))
         .expect("fee collector set");
-    let stored_fee: i128 = env
-        .as_contract(&client.address, || {
-            env.storage().instance().get(&DataKey::ArbitrationFee)
-        })
-        .expect("arbitration fee set");
+    let stored_fee: crate::FeeConfig = env
+        .as_contract(&client.address, || env.storage().instance().get(&DataKey::FeeConfig))
+        .expect("fee config set");
 
     assert_eq!(stored_admin, admin_a);
     assert_eq!(stored_collector, fee_collector_a);
-    assert_eq!(stored_fee, 42_i128);
+    assert_eq!(stored_fee.arbitration_fee_bps, 42);
 }

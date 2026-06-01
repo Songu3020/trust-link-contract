@@ -6,9 +6,11 @@ export type Result<T> = T | null;
 export enum EscrowState {
   Pending = "Pending",
   Funded = "Funded",
+  Shipped = "Shipped",
   Completed = "Completed",
   Disputed = "Disputed",
   Refunded = "Refunded",
+  Canceled = "Canceled",
 }
 
 export enum DisputeStatus {
@@ -34,6 +36,7 @@ export enum ContractError {
   InvalidEvidenceHash = 10,
   DisputeNotFound = 11,
   ContractPaused = 12,
+  InvalidTrackingId = 13,
 }
 
 export interface FeeConfig {
@@ -69,6 +72,9 @@ export interface EscrowData {
   funded_at: bigint;
   dispute_deadline: bigint;
   state: EscrowState;
+  shipped_at: bigint;
+  tracking_id: string | null;
+  delivered_at: bigint;
 }
 
 export interface DisputeData {
@@ -77,5 +83,5 @@ export interface DisputeData {
   description: string;
   evidence_hash: Bytes32;
   status: DisputeStatus;
-  raised_at: bigint;
+  disputed_at: bigint;
 }

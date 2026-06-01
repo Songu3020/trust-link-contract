@@ -13,7 +13,8 @@ export const contractAbi = {
       output: "u64",
     },
     { name: "fund_escrow", inputs: ["escrow_id", "buyer"], output: "void" },
-    { name: "confirm_delivery", inputs: ["escrow_id"], output: "void" },
+    { name: "mark_shipped", inputs: ["caller", "escrow_id", "tracking_id"], output: "void" },
+    { name: "confirm_delivery", inputs: ["caller", "escrow_id"], output: "void" },
     {
       name: "raise_dispute",
       inputs: ["escrow_id", "reason", "description", "evidence_hash"],

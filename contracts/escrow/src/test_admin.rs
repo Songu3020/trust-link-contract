@@ -23,7 +23,7 @@ fn test_admin_rotation() {
     client.set_admin(&new_admin);
 
     // new admin can call set_fee
-    client.set_fee(&100_u32);
+    client.set_protocol_fee(&new_admin, &100_u32);
 
     // old admin can no longer set_fee (auth will fail — mock_all_auths means any address is
     // treated as authorized, so we verify state rather than auth enforcement here)
@@ -36,9 +36,9 @@ fn test_set_fee_updates_default_fee() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let (_contract_id, client, _admin, _fee_collector) = setup_contract(&env);
+    let (_contract_id, client, admin, _fee_collector) = setup_contract(&env);
 
-    client.set_fee(&150_u32);
+    client.set_protocol_fee(&admin, &150_u32);
 }
 
 #[test]
@@ -46,9 +46,9 @@ fn test_set_fee_exceeds_max_fails() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let (_contract_id, client, _admin, _fee_collector) = setup_contract(&env);
+    let (_contract_id, client, admin, _fee_collector) = setup_contract(&env);
 
-    let result = client.try_set_fee(&301_u32);
+    let result = client.try_set_protocol_fee(&admin, &10_001_u32);
     assert!(matches!(result, Err(Ok(ContractError::FeeExceedsMax))));
 }
 
@@ -76,6 +76,6 @@ fn test_set_ttl_extension() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let (_contract_id, client, _admin, _fee_collector) = setup_contract(&env);
-    client.set_ttl_extension(&60_480_u32);
+    let (_contract_id, client, admin, _fee_collector) = setup_contract(&env);
+    client.set_ttl_extension(&admin, &60_480_u32);
 }
