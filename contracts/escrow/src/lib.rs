@@ -289,10 +289,16 @@ fn increment_counter(env: &Env, key: &DataKey) -> Result<(), ContractError> {
 #[allow(deprecated)]
 impl Escrow {
     /// Sets the protocol fee collector, admin address, and arbitration fee. Must be called once.
+    ///
+    /// Returns `Err(ContractError::InvalidAddress)` if `admin` or `fee_collector` is the
+    /// all-zero/empty Stellar account address (#55). Returning early on validation failure
+    /// guarantees no storage entries (`Admin`, `FeeCollector`, `ArbitrationFee`,
+    /// `EscrowCounter`, `Paused`) are written, leaving the contract uninitialized.
     pub fn initialize(
         env: Env,
         admin: Address,
         fee_collector: Address,
+        arbitration_fee: i128,
         arbitration_fee_bps: u32,
     ) -> Result<(), ContractError> {
         if env.storage().instance().has(&DataKey::Admin) {
@@ -304,6 +310,14 @@ impl Escrow {
             return Err(ContractError::InvalidAddress);
         }
         validate_config_fee_bps(arbitration_fee_bps)?;
+
+        let zero = Address::from_string(&String::from_str(
+            &env,
+            "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+        ));
+        if admin == zero || fee_collector == zero {
+            return Err(ContractError::InvalidAddress);
+        }
 
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::FeeCollector, &fee_collector);
@@ -956,6 +970,7 @@ mod test_escrow_states;
 mod test_admin_rotation;
 mod test_auto_release;
 mod test_initialize_twice;
+mod test_initialize_zero_admin;
 mod test_contract_config;
 mod test_string_length;
 mod test_get_escrows_by_buyer;
